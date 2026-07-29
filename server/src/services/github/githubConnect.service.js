@@ -33,6 +33,7 @@ export const githubConnectService = async (userId, accessToken) => {
     const headers = {
       Authorization: `Bearer ${accessToken}`,
       Accept: 'application/vnd.github+json',
+      'User-Agent': 'Aurex-App',
     };
 
     const [profileRes, emailsRes] = await Promise.all([
@@ -43,6 +44,7 @@ export const githubConnectService = async (userId, accessToken) => {
     profileData = profileRes.data;
     emailsData = emailsRes.data || [];
   } catch (error) {
+    console.error('[GitHub Connect Error]', error.response?.data || error.message);
     if (error instanceof ApiError) {
       throw error;
     }
