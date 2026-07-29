@@ -1,7 +1,9 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import config from './config/config.js';
+import authRoutes from './routes/auth.routes.js';
 import apiRouter from './routes/index.js';
 
 const app = express();
@@ -18,6 +20,9 @@ app.use(cookieParser());
 // Body parsing middlewares with payload size limits
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Mount authentication routes
+app.use('/api/auth', authRoutes);
 
 // Mount main API routes
 app.use('/api', apiRouter);
@@ -43,6 +48,7 @@ app.use((err, req, res, next) => {
   res.status(statusCode).json({
     success: false,
     message,
+    errors: err.errors || [],
     ...(config.env === 'development' && { stack: err.stack }),
   });
 });
