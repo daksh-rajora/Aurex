@@ -12,9 +12,11 @@ export const connectDB = async () => {
     }
 
     console.log('Connecting to MongoDB...');
-    const conn = await mongoose.connect(config.mongoUri);
+    const conn = await mongoose.connect(config.mongoUri, {
+      serverSelectionTimeoutMS: 5000,
+    });
 
-    console.log('MongoDB Connected');
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
     console.error(`MongoDB connection error: ${error.message}`);
     throw error; // Propagate error to let server.js handle it
