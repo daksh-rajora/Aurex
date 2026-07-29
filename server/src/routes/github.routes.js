@@ -12,14 +12,14 @@ const router = Router();
 
 /**
  * @route   GET /login
- * @desc    Initiate GitHub OAuth flow
+ * @desc    Initiate GitHub OAuth flow (optional ?token=<JWT> query param for state preservation)
  * @access  Public
  */
 router.get('/login', githubLogin);
 
 /**
  * @route   GET /callback
- * @desc    Handle GitHub OAuth callback and code exchange
+ * @desc    Handle GitHub OAuth callback
  * @access  Public
  */
 router.get('/callback', githubCallback);
@@ -27,13 +27,13 @@ router.get('/callback', githubCallback);
 /**
  * @route   GET /profile
  * @desc    Fetch authenticated GitHub user profile
- * @access  Public
+ * @access  Private (JWT Required)
  */
-router.get('/profile', getGithubProfile);
+router.get('/profile', authenticateUser, getGithubProfile);
 
 /**
  * @route   POST /connect
- * @desc    Link GitHub account to authenticated Aurex user
+ * @desc    Link GitHub account to authenticated Aurex user in MongoDB
  * @access  Private (JWT Required)
  */
 router.post('/connect', authenticateUser, githubConnect);
