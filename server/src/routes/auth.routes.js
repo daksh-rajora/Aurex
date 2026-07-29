@@ -1,5 +1,10 @@
 import { Router } from 'express';
 import { registerUser } from '../controllers/auth/register.controller.js';
+import registerValidator from '../validators/auth/register.validator.js';
+import { loginUser } from '../controllers/auth/login.controller.js';
+import loginValidator from '../validators/auth/login.validator.js';
+import { getCurrentUser } from '../controllers/auth/currentUser.controller.js';
+import { authenticateUser } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
@@ -8,14 +13,12 @@ const router = Router();
  */
 
 // POST /register - Register a new user
-router.post('/register', registerUser);
+router.post('/register', registerValidator, registerUser);
 
-// Future Authentication Routes (Placeholders)
-// POST /login          - Authenticate user
-// POST /logout         - Log out user
-// GET  /me             - Get current user profile
-// POST /refresh-token  - Refresh authentication tokens
-// POST /forgot-password - Request password reset email
-// POST /reset-password  - Reset user password
+// POST /login - Authenticate user
+router.post('/login', loginValidator, loginUser);
+
+// GET /me - Get current authenticated user details
+router.get('/me', authenticateUser, getCurrentUser);
 
 export default router;
