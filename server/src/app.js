@@ -4,6 +4,9 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import config from './config/config.js';
 import authRoutes from './routes/auth.routes.js';
+import githubRoutes from './routes/github.routes.js';
+import aiRoutes from './routes/ai.routes.js';
+import analysisRoutes from './routes/analysis.routes.js';
 import apiRouter from './routes/index.js';
 
 const app = express();
@@ -23,6 +26,15 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Mount authentication routes
 app.use('/api/auth', authRoutes);
+
+// Mount GitHub OAuth routes
+app.use('/api/github', githubRoutes);
+
+// Mount AI review routes
+app.use('/api/ai', aiRoutes);
+
+// Mount Analysis routes
+app.use('/api/analysis', analysisRoutes);
 
 // Mount main API routes
 app.use('/api', apiRouter);
