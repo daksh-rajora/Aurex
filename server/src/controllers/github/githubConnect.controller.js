@@ -4,7 +4,7 @@ import ApiError from '../../utils/ApiError.js';
 import { githubConnectService } from '../../services/github/githubConnect.service.js';
 
 /**
- * Controller to connect GitHub account to the currently authenticated Aurex user.
+ * Controller to connect GitHub account to the currently authenticated Aurex user in MongoDB.
  */
 export const githubConnect = asyncHandler(async (req, res) => {
   const userId = req.user?._id;
@@ -18,7 +18,7 @@ export const githubConnect = asyncHandler(async (req, res) => {
   }
 
   if (!accessToken) {
-    throw new ApiError(400, 'GitHub access token is required');
+    throw new ApiError(400, 'GitHub access token is required in request body');
   }
 
   const user = await githubConnectService(userId, accessToken);
