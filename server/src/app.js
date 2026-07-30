@@ -7,6 +7,7 @@ import authRoutes from './routes/auth.routes.js';
 import githubRoutes from './routes/github.routes.js';
 import aiRoutes from './routes/ai.routes.js';
 import analysisRoutes from './modules/analysis/analysis.routes.js';
+import publicAnalysisRoutes from './modules/analysis/publicAnalysis.routes.js';
 import jobRoutes from './routes/job.routes.js';
 import apiRouter from './routes/index.js';
 
@@ -36,6 +37,10 @@ app.use('/api/ai', aiRoutes);
 
 // Mount Repository Analysis module routes
 app.use('/api/analysis', analysisRoutes);
+
+// Mount Public Repository Analysis route
+app.use('/api/public-analysis', publicAnalysisRoutes);
+
 
 // Mount Background Job routes
 app.use('/api/jobs', jobRoutes);
