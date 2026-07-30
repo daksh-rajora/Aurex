@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import {
   startAnalysis,
+  runAIAnalysis,
   getAnalysisHistory,
   getSingleAnalysis,
+  getAnalysisReport,
   deleteAnalysis,
 } from './analysis.controller.js';
 import {
@@ -22,10 +24,24 @@ router.get('/history', authenticateUser, getAnalysisHistory);
 
 /**
  * @route   POST /:owner/:repo
- * @desc    Start repository analysis
+ * @desc    Start repository metadata collection
  * @access  Private (JWT Required)
  */
 router.post('/:owner/:repo', authenticateUser, validateStartAnalysis, startAnalysis);
+
+/**
+ * @route   POST /:analysisId/run
+ * @desc    Execute AI analysis on stored repository metadata
+ * @access  Private (JWT Required)
+ */
+router.post('/:analysisId/run', authenticateUser, validateAnalysisId, runAIAnalysis);
+
+/**
+ * @route   GET /:analysisId/report
+ * @desc    Return detailed AI analysis report document
+ * @access  Private (JWT Required)
+ */
+router.get('/:analysisId/report', authenticateUser, validateAnalysisId, getAnalysisReport);
 
 /**
  * @route   GET /:analysisId
@@ -42,3 +58,4 @@ router.get('/:analysisId', authenticateUser, validateAnalysisId, getSingleAnalys
 router.delete('/:analysisId', authenticateUser, validateAnalysisId, deleteAnalysis);
 
 export default router;
+
