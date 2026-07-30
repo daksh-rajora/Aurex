@@ -5,7 +5,8 @@ const analysisSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: false,
+      default: null,
       index: true,
     },
     repository: {
@@ -24,6 +25,10 @@ const analysisSchema = new mongoose.Schema(
         required: true,
         trim: true,
       },
+      description: {
+        type: String,
+        default: '',
+      },
       htmlUrl: {
         type: String,
         default: '',
@@ -31,10 +36,6 @@ const analysisSchema = new mongoose.Schema(
       defaultBranch: {
         type: String,
         default: 'main',
-      },
-      description: {
-        type: String,
-        default: '',
       },
       visibility: {
         type: String,
@@ -71,12 +72,41 @@ const analysisSchema = new mongoose.Schema(
         default: [],
       },
     },
+    metadata: {
+      languages: {
+        type: mongoose.Schema.Types.Mixed,
+        default: {},
+      },
+      readme: {
+        exists: { type: Boolean, default: false },
+        content: { type: String, default: null },
+      },
+      rootContents: [
+        {
+          name: { type: String },
+          type: { type: String },
+          path: { type: String },
+        },
+      ],
+    },
     analysis: {
       overallScore: {
         type: Number,
         default: 0,
       },
       codeQuality: {
+        type: Number,
+        default: 0,
+      },
+      documentation: {
+        type: Number,
+        default: 0,
+      },
+      architecture: {
+        type: Number,
+        default: 0,
+      },
+      maintainability: {
         type: Number,
         default: 0,
       },
@@ -88,21 +118,41 @@ const analysisSchema = new mongoose.Schema(
         type: Number,
         default: 0,
       },
-      architecture: {
-        type: Number,
-        default: 0,
-      },
-      documentation: {
-        type: Number,
-        default: 0,
-      },
-      maintainability: {
-        type: Number,
-        default: 0,
-      },
       bestPractices: {
         type: Number,
         default: 0,
+      },
+      techStack: {
+        type: [String],
+        default: [],
+      },
+      architectureReview: {
+        type: String,
+        default: '',
+      },
+      codeQualityReview: {
+        type: String,
+        default: '',
+      },
+      documentationReview: {
+        type: String,
+        default: '',
+      },
+      securityReview: {
+        type: String,
+        default: '',
+      },
+      performanceReview: {
+        type: String,
+        default: '',
+      },
+      maintainabilityReview: {
+        type: String,
+        default: '',
+      },
+      bestPracticesReview: {
+        type: String,
+        default: '',
       },
       strengths: {
         type: [String],
@@ -121,15 +171,15 @@ const analysisSchema = new mongoose.Schema(
         default: '',
       },
     },
+    aiProvider: {
+      type: String,
+      default: 'None',
+    },
     status: {
       type: String,
       enum: ['Pending', 'Processing', 'Completed', 'Failed'],
       default: 'Pending',
       index: true,
-    },
-    aiProvider: {
-      type: String,
-      default: 'Placeholder',
     },
   },
   {
@@ -143,3 +193,5 @@ analysisSchema.index({ user: 1, createdAt: -1 });
 const Analysis = mongoose.model('Analysis', analysisSchema);
 
 export default Analysis;
+
+
