@@ -4,9 +4,13 @@ import Analysis from '../../models/Analysis.js';
 import ApiError from '../../utils/ApiError.js';
 import githubConfig from '../../config/github.config.js';
 import { repositoryDetailsService } from '../../services/github/repositoryDetails.service.js';
+import {
+  runAIAnalysisService,
+  getAnalysisReportService,
+} from './services/aiAnalysis.service.js';
 
 /**
- * Service to initiate repository analysis for the logged-in user.
+ * Service to initiate repository analysis metadata collection and store in MongoDB.
  *
  * @param {Object} params - Parameters object
  * @param {string} params.userId - Authenticated user ID
@@ -15,12 +19,12 @@ import { repositoryDetailsService } from '../../services/github/repositoryDetail
  * @returns {Promise<Object>} Created Analysis document
  */
 export const startAnalysisService = async ({ userId, owner, repo }) => {
-  // 1. Verify logged-in user
+  // 1. Verify user authentication
   if (!userId) {
     throw new ApiError(401, 'Authentication is required');
   }
 
-  // 2. Verify user & GitHub connected
+  // 2. Verify GitHub account connection
   const user = await User.findById(userId).select('+githubAccessToken');
   if (!user) {
     throw new ApiError(404, 'User not found');
@@ -33,7 +37,7 @@ export const startAnalysisService = async ({ userId, owner, repo }) => {
     );
   }
 
-  // 3 & 4 & 5. Fetch repository details, languages, and README
+  // 3, 4, 5. Fetch repository details, languages, and README via GitHub service layer
   const repoDetails = await repositoryDetailsService({ userId, owner, repo });
   const { repository, languages, readme } = repoDetails;
 
@@ -51,13 +55,19 @@ export const startAnalysisService = async ({ userId, owner, repo }) => {
       }
     );
     rootContents = Array.isArray(contentsRes.data)
-      ? contentsRes.data.map((item) => ({ name: item.name, type: item.type, path: item.path }))
+      ? contentsRes.data.map((item) => ({
+          name: item.name,
+          type: item.type,
+          path: item.path,
+        }))
       : [];
   } catch (err) {
     console.warn(`[Analysis Service] Warning fetching root contents for ${owner}/${repo}:`, err.message);
   }
 
-  // 7. Store everything in MongoDB with status Processing, then update to Completed
+  // 7 & 8. Store all collected repository metadata in MongoDB with placeholder analysis
+  const mainLanguage = repository.language || (languages && Object.keys(languages)[0]) || 'Unknown';
+
   const analysisDoc = await Analysis.create({
     user: userId,
     repository: {
@@ -71,34 +81,34 @@ export const startAnalysisService = async ({ userId, owner, repo }) => {
     },
     github: {
       repoId: String(repository.id || ''),
-      language: repository.language || Object.keys(languages)[0] || 'Unknown',
+      language: mainLanguage,
       stars: repository.stargazers_count || 0,
       forks: repository.forks_count || 0,
       watchers: repository.watchers_count || 0,
       openIssues: repository.open_issues_count || 0,
       topics: Array.isArray(repository.topics) ? repository.topics : [],
     },
+    metadata: {
+      languages: languages || {},
+      readme: readme || { exists: false, content: null },
+      rootContents: rootContents || [],
+    },
     analysis: {
       overallScore: 0,
       codeQuality: 0,
+      documentation: 0,
+      architecture: 0,
+      maintainability: 0,
       security: 0,
       performance: 0,
-      architecture: 0,
-      documentation: readme?.exists ? 50 : 0,
-      maintainability: 0,
       bestPractices: 0,
-      strengths: rootContents.length > 0 ? ['Root directory files indexed'] : [],
-      weaknesses: readme?.exists ? [] : ['Missing README file'],
-      suggestions: ['AI Analysis will be implemented later'],
-      summary: 'Repository successfully collected. AI analysis will be implemented later.',
+      strengths: [],
+      weaknesses: [],
+      suggestions: [],
+      summary: 'Repository data collected successfully. AI analysis has not been executed yet.',
     },
-    status: 'Processing',
-    aiProvider: 'Placeholder',
+    status: 'Completed',
   });
-
-  // Mark as Completed after data collection
-  analysisDoc.status = 'Completed';
-  await analysisDoc.save();
 
   return analysisDoc;
 };
@@ -107,7 +117,7 @@ export const startAnalysisService = async ({ userId, owner, repo }) => {
  * Service to fetch analysis history for the logged-in user.
  *
  * @param {string} userId - Authenticated user ID
- * @returns {Promise<Array<Object>>} Formatted history list
+ * @returns {Promise<Array<Object>>} Formatted analysis history list
  */
 export const getAnalysisHistoryService = async (userId) => {
   if (!userId) {
@@ -115,15 +125,15 @@ export const getAnalysisHistoryService = async (userId) => {
   }
 
   const history = await Analysis.find({ user: userId })
-    .select('repository.name repository.owner analysis.overallScore status createdAt')
+    .select('repository status analysis.overallScore createdAt')
     .sort({ createdAt: -1 });
 
   return history.map((item) => ({
     _id: item._id,
-    repositoryName: item.repository?.name,
-    owner: item.repository?.owner,
-    overallScore: item.analysis?.overallScore ?? 0,
+    repository: item.repository?.name || '',
+    owner: item.repository?.owner || '',
     status: item.status,
+    overallScore: item.analysis?.overallScore ?? 0,
     createdAt: item.createdAt,
   }));
 };
@@ -172,9 +182,16 @@ export const deleteAnalysisService = async ({ userId, analysisId }) => {
   return { id: analysisId, deleted: true };
 };
 
+export {
+  runAIAnalysisService,
+  getAnalysisReportService,
+};
+
 export default {
   startAnalysisService,
   getAnalysisHistoryService,
   getSingleAnalysisService,
   deleteAnalysisService,
+  runAIAnalysisService,
+  getAnalysisReportService,
 };
