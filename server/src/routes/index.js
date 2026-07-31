@@ -6,6 +6,8 @@ import aiRoutes from './ai.routes.js';
 import analysisRoutes from '../modules/analysis/analysis.routes.js';
 import publicAnalysisRoutes from '../modules/analysis/publicAnalysis.routes.js';
 import jobRoutes from './job.routes.js';
+import dashboardRoutes from '../modules/dashboard/dashboard.routes.js';
+import reportRoutes from '../modules/report/report.routes.js';
 
 const router = Router();
 
@@ -16,6 +18,8 @@ router.use('/github', githubRoutes);
 router.use('/ai', aiRoutes);
 router.use('/analysis', analysisRoutes);
 router.use('/public-analysis', publicAnalysisRoutes);
+router.use('/dashboard', dashboardRoutes);
+router.use('/report', reportRoutes);
 router.use('/jobs', jobRoutes);
 
 export default router;
