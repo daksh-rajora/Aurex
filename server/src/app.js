@@ -9,6 +9,8 @@ import aiRoutes from './routes/ai.routes.js';
 import analysisRoutes from './modules/analysis/analysis.routes.js';
 import publicAnalysisRoutes from './modules/analysis/publicAnalysis.routes.js';
 import jobRoutes from './routes/job.routes.js';
+import dashboardRoutes from './modules/dashboard/dashboard.routes.js';
+import reportRoutes from './modules/report/report.routes.js';
 import apiRouter from './routes/index.js';
 
 const app = express();
@@ -41,6 +43,11 @@ app.use('/api/analysis', analysisRoutes);
 // Mount Public Repository Analysis route
 app.use('/api/public-analysis', publicAnalysisRoutes);
 
+// Mount Dashboard module routes
+app.use('/api/dashboard', dashboardRoutes);
+
+// Mount PDF Report Export module routes
+app.use('/api/report', reportRoutes);
 
 // Mount Background Job routes
 app.use('/api/jobs', jobRoutes);
