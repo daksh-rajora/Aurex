@@ -30,15 +30,26 @@ export const useLogin = () => {
       navigate('/dashboard');
       return { success: true };
     } catch (err) {
+      const status = err.response?.status;
+      const responseData = err.response?.data;
       const errorMessage =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
+        responseData?.message ||
+        responseData?.error ||
         err.message ||
         'Login failed. Please check your credentials.';
 
+      const field = responseData?.field;
+
       setServerError(errorMessage);
       dispatch(loginFailure(errorMessage));
-      return { success: false, error: errorMessage };
+
+      return {
+        success: false,
+        error: errorMessage,
+        status,
+        field,
+        responseData,
+      };
     }
   };
 
