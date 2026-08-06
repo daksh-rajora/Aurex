@@ -1,4 +1,5 @@
 import AuthCard from '../components/auth/AuthCard.jsx';
+import LoginForm from '../components/auth/LoginForm.jsx';
 
 export const Login = () => {
   return (
@@ -9,12 +10,19 @@ export const Login = () => {
 
       {/* Top Spacer for Vertically Centered Card */}
       <div className="w-full flex-1 flex items-center justify-center py-6">
-        <AuthCard />
+        <AuthCard
+          brandName="Aurex"
+          brandSubtitle="Developer Intelligence Platform"
+          title="Welcome back"
+          subtitle="Enter your credentials to access your developer dashboard"
+        >
+          <LoginForm />
+        </AuthCard>
       </div>
 
       {/* Footer Navigation & Copyright */}
       <footer className="w-full max-w-5xl mx-auto pt-6 border-t border-[#2A3247]/40 flex flex-col sm:flex-row items-center justify-between text-xs text-[#94A3B8] gap-4 relative z-10">
-        <div>© 2026 Aurex AI. All rights reserved.</div>
+        <div>© 2026 Aurex. All rights reserved.</div>
         <div className="flex items-center gap-6">
           <a
             href="#privacy"
