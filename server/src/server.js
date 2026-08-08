@@ -1,7 +1,16 @@
 import 'dotenv/config';
+
+console.log(
+  process.env.OPENROUTER_API_KEY
+    ? "✅ OpenRouter API Key Loaded"
+    : "❌ OpenRouter API Key Missing"
+);
 import app from './app.js';
 import config from './config/config.js';
 import { connectDB } from './config/db.js';
+import { verifyResendProvider } from './services/email/providers/resend.provider.js';
+
+import { initSocket } from './socket.js';
 
 // Handle uncaught exception errors globally
 process.on('uncaughtException', (err) => {
@@ -21,13 +30,20 @@ const startServer = async () => {
     // 1. Establish database connection
     await connectDB();
 
-    // 2. Start listening for incoming HTTP requests
+    // 2. Verify Resend Email Provider initialization
+    verifyResendProvider();
+
+    // 3. Start listening for incoming HTTP requests
     server = app.listen(config.port, () => {
       console.log(`=================================================`);
       console.log(`  Aurex Server is running in [${config.env}] mode`);
       console.log(`  Local Endpoint: http://localhost:${config.port}`);
       console.log(`=================================================`);
     });
+
+    // 4. Initialize Socket.IO real-time server
+    initSocket(server);
+    console.log('✅ Socket.IO Real-Time Engine Initialized');
   } catch (error) {
     console.error(`Failed to initialize application server: ${error.message}`);
     process.exit(1);
