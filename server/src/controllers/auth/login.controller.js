@@ -6,10 +6,15 @@ import { loginUserService } from '../../services/auth/loginUser.service.js';
  * Controller to handle user login requests.
  */
 export const loginUser = asyncHandler(async (req, res) => {
-  const { emailOrUsername, password } = req.body;
+  // Temporary console logs for debugging request payload
+  console.log('Request Body:', req.body);
+  console.log('Email:', req.body?.email);
+  console.log('Password:', req.body?.password ? '***' : undefined);
+
+  const { email, password } = req.body;
 
   const authData = await loginUserService({
-    emailOrUsername,
+    email,
     password,
   });
 
