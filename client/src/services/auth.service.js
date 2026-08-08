@@ -27,6 +27,41 @@ export const authService = {
   },
 
   /**
+   * Request password reset OTP
+   * @param {Object} data - { email }
+   */
+  forgotPassword: async (data) => {
+    const response = await axiosInstance.post('/auth/forgot-password', data);
+    return response.data;
+  },
+
+  /**
+   * Verify password reset OTP
+   * @param {Object} data - { email, otp }
+   */
+  verifyResetOtp: async (data) => {
+    const response = await axiosInstance.post('/auth/verify-reset-otp', data);
+    return response.data;
+  },
+
+  /**
+   * Alias for verifyResetOtp
+   */
+  verifyOtp: async (data) => {
+    const response = await axiosInstance.post('/auth/verify-reset-otp', data);
+    return response.data;
+  },
+
+  /**
+   * Reset user password
+   * @param {Object} data - { email, password }
+   */
+  resetPassword: async (data) => {
+    const response = await axiosInstance.post('/auth/reset-password', data);
+    return response.data;
+  },
+
+  /**
    * Logout user
    */
   logout: async () => {
