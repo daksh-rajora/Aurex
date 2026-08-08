@@ -41,9 +41,21 @@ const analysisSchema = new mongoose.Schema(
         type: String,
         default: 'public',
       },
+      license: {
+        type: String,
+        default: 'MIT',
+      },
+      size: {
+        type: String,
+        default: '1.0 MB',
+      },
     },
     github: {
       repoId: {
+        type: String,
+        default: '',
+      },
+      htmlUrl: {
         type: String,
         default: '',
       },
@@ -166,6 +178,10 @@ const analysisSchema = new mongoose.Schema(
         type: [String],
         default: [],
       },
+      recommendations: {
+        type: [String],
+        default: [],
+      },
       summary: {
         type: String,
         default: '',
@@ -173,13 +189,21 @@ const analysisSchema = new mongoose.Schema(
     },
     aiProvider: {
       type: String,
-      default: 'None',
+      default: 'OpenRouter',
     },
     status: {
       type: String,
       enum: ['Pending', 'Processing', 'Completed', 'Failed'],
       default: 'Pending',
       index: true,
+    },
+    errorMessage: {
+      type: String,
+      default: '',
+    },
+    completedAt: {
+      type: Date,
+      default: null,
     },
   },
   {
