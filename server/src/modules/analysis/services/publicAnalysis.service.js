@@ -238,7 +238,7 @@ export const publicAnalysisService = async ({ repository, url, userId, provider 
   // 5. Execute AI analysis using existing provider factory & prompt builder
   try {
     const prompt = buildRepositoryPrompt(analysisDoc);
-    const selectedProvider = provider || process.env.AI_PROVIDER || 'gemini';
+    const selectedProvider = provider || process.env.AI_PROVIDER || 'openrouter';
     const aiResponse = await executeAIAnalysis(prompt, selectedProvider);
 
     const overallScore = typeof aiResponse.overallScore === 'number'
