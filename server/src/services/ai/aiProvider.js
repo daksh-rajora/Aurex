@@ -1,6 +1,6 @@
 import ApiError from '../../utils/ApiError.js';
 import { generateOpenAIReview } from './openai.provider.js';
-import { generateGeminiReview } from './gemini.provider.js';
+import { generateOpenRouterReview } from './openrouter.provider.js';
 
 /**
  * AI Provider Factory to dynamically select AI engine based on process.env.AI_PROVIDER.
@@ -9,20 +9,18 @@ import { generateGeminiReview } from './gemini.provider.js';
  * @returns {Promise<Object>} Parsed JSON response from selected AI provider
  */
 export const generateAIReview = async (prompt) => {
-  const provider = (process.env.AI_PROVIDER || 'openai').toLowerCase().trim();
+  const provider = (process.env.AI_PROVIDER || 'openrouter').toLowerCase().trim();
 
   switch (provider) {
     case 'openai':
       return await generateOpenAIReview(prompt);
 
+    case 'openrouter':
     case 'gemini':
-      return await generateGeminiReview(prompt);
+      return await generateOpenRouterReview(prompt);
 
     default:
-      throw new ApiError(
-        500,
-        `Unsupported AI_PROVIDER: "${provider}". Expected "openai" or "gemini".`
-      );
+      return await generateOpenRouterReview(prompt);
   }
 };
 
