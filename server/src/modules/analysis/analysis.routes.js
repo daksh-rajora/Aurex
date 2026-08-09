@@ -23,6 +23,13 @@ const router = Router();
 router.get('/history', authenticateUser, getAnalysisHistory);
 
 /**
+ * @route   POST /start
+ * @desc    Start repository analysis with body details
+ * @access  Private (JWT Required)
+ */
+router.post('/start', authenticateUser, startAnalysis);
+
+/**
  * @route   POST /:owner/:repo
  * @desc    Start repository metadata collection
  * @access  Private (JWT Required)
