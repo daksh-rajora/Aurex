@@ -3,6 +3,7 @@ import ApiResponse from '../../utils/ApiResponse.js';
 import ApiError from '../../utils/ApiError.js';
 import {
   startAnalysisService,
+  createStartAnalysisService,
   getAnalysisHistoryService,
   getSingleAnalysisService,
   deleteAnalysisService,
@@ -14,18 +15,32 @@ import {
  * Controller to start a new repository analysis.
  */
 export const startAnalysis = asyncHandler(async (req, res) => {
-  const { owner, repo } = req.params;
   const userId = req.user?._id;
 
   if (!userId) {
     throw new ApiError(401, 'Authentication required');
   }
 
-  const analysisReport = await startAnalysisService({
-    userId,
-    owner,
-    repo,
-  });
+  const { owner: paramOwner, repo: paramRepo } = req.params;
+  const { repositoryId, repositoryName, owner: bodyOwner, githubUrl, language } = req.body || {};
+
+  let analysisReport;
+  if (paramOwner && paramRepo) {
+    analysisReport = await startAnalysisService({
+      userId,
+      owner: paramOwner,
+      repo: paramRepo,
+    });
+  } else {
+    analysisReport = await createStartAnalysisService({
+      userId,
+      repositoryId,
+      repositoryName: repositoryName || paramRepo,
+      owner: bodyOwner || paramOwner,
+      githubUrl,
+      language,
+    });
+  }
 
   return res
     .status(201)
