@@ -1,14 +1,23 @@
 import { Router } from 'express';
-import { getRepositoryAIReview } from '../controllers/ai/repositoryReview.controller.js';
-import { authenticateUser } from '../middlewares/auth.middleware.js';
+import { testOpenRouterConnection } from '../services/ai/openrouter.service.js';
+import asyncHandler from '../utils/asyncHandler.js';
 
 const router = Router();
 
 /**
- * @route   POST /repository-review
- * @desc    Generate AI-powered code & repository review
- * @access  Private (JWT Required)
+ * @route   GET /test
+ * @desc    Temporary test endpoint for OpenRouter API connection
+ * @access  Public
  */
-router.post('/repository-review', authenticateUser, getRepositoryAIReview);
+router.get(
+  '/test',
+  asyncHandler(async (req, res) => {
+    const message = await testOpenRouterConnection();
+    return res.status(200).json({
+      success: true,
+      message,
+    });
+  })
+);
 
 export default router;
