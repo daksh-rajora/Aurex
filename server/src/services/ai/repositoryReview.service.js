@@ -62,7 +62,7 @@ Respond ONLY with a JSON object containing the following exact keys:
 }
 `;
 
-  // 3. Generate review using configured AI Provider (OpenAI or Gemini)
+  // 3. Generate review using configured AI Provider (OpenAI or OpenRouter)
   const aiReview = await generateAIReview(prompt);
 
   // 4. Sanitize and format response object
