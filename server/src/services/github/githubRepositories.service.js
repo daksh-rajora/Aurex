@@ -66,6 +66,14 @@ export const githubRepositoriesService = async (userId) => {
       created_at: repo.created_at,
       updated_at: repo.updated_at,
       pushed_at: repo.pushed_at,
+      owner: repo.owner
+        ? {
+            login: repo.owner.login,
+            avatar_url: repo.owner.avatar_url,
+            html_url: repo.owner.html_url,
+          }
+        : null,
+      topics: repo.topics || [],
     }));
 
     return repositories;
