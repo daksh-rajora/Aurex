@@ -4,6 +4,58 @@ import ApiError from '../../utils/ApiError.js';
 import githubConfig from '../../config/github.config.js';
 
 /**
+ * Secret / Ignored files check according to Requirement 6:
+ * Ignore: .env, .env.*, private keys, API keys, tokens, credentials, node_modules, .git, dist, build, coverage, binary/media files
+ */
+export const isIgnoredFile = (filePath) => {
+  if (!filePath) return true;
+  const lower = filePath.toLowerCase();
+  const basename = filePath.split('/').pop().toLowerCase();
+
+  // Ignored secrets & config files
+  if (
+    basename.startsWith('.env') ||
+    basename.includes('secret') ||
+    basename.includes('id_rsa') ||
+    basename.endsWith('.pem') ||
+    basename.endsWith('.key') ||
+    basename.includes('token') ||
+    basename.includes('credentials')
+  ) {
+    return true;
+  }
+
+  // Ignored directories
+  if (
+    lower.startsWith('node_modules/') ||
+    lower.startsWith('.git/') ||
+    lower.startsWith('dist/') ||
+    lower.startsWith('build/') ||
+    lower.startsWith('coverage/') ||
+    lower.includes('/node_modules/') ||
+    lower.includes('/.git/') ||
+    lower.includes('/dist/') ||
+    lower.includes('/build/') ||
+    lower.includes('/coverage/')
+  ) {
+    return true;
+  }
+
+  // Binary & Media Extensions
+  const binaryExtensions = [
+    '.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', '.webp', '.avif',
+    '.zip', '.tar', '.gz', '.7z', '.pdf', '.mp4', '.mp3', '.mov',
+    '.woff', '.woff2', '.ttf', '.eot', '.lock', '.exe', '.dll', '.so', '.dylib', '.jar'
+  ];
+
+  if (binaryExtensions.some((ext) => lower.endsWith(ext))) {
+    return true;
+  }
+
+  return false;
+};
+
+/**
  * Service to fetch detailed information and metadata for a specific GitHub repository.
  *
  * @param {Object} params - Parameters object
@@ -65,20 +117,43 @@ export const repositoryDetailsService = async ({ userId, owner, repo }) => {
       readmeData = { exists: false, content: null };
     }
 
-    // 4. Format root folder structure (top-level files & folders only)
-    const rootContents = Array.isArray(contentsRes.data)
-      ? contentsRes.data.map((item) => ({
-          name: item.name,
-          type: item.type === 'dir' ? 'dir' : 'file',
-          path: item.path,
-        }))
-      : [];
+    // 4. Format root folder structure (excluding ignored files)
+    const rawContents = Array.isArray(contentsRes.data) ? contentsRes.data : [];
+    const rootContents = rawContents
+      .filter((item) => !isIgnoredFile(item.path))
+      .map((item) => ({
+        name: item.name,
+        type: item.type === 'dir' ? 'dir' : 'file',
+        path: item.path,
+      }));
+
+    // 5. Fetch relevant source file contents (e.g. package.json, main source files)
+    const sourceFiles = [];
+    const filesToFetch = rawContents
+      .filter((item) => item.type === 'file' && !isIgnoredFile(item.path) && item.name !== 'README.md')
+      .slice(0, 6);
+
+    for (const fileItem of filesToFetch) {
+      try {
+        const fileRes = await axios.get(`${baseUrl}/contents/${fileItem.path}`, { headers });
+        if (fileRes.data && fileRes.data.content && fileRes.data.encoding === 'base64') {
+          const content = Buffer.from(fileRes.data.content, 'base64').toString('utf-8');
+          sourceFiles.push({
+            path: fileItem.path,
+            content: content.slice(0, 3000),
+          });
+        }
+      } catch (err) {
+        // Skip individual file error
+      }
+    }
 
     return {
       repository: repoRes.data,
       languages: languagesRes.data || {},
       readme: readmeData,
       rootContents,
+      sourceFiles,
     };
   } catch (error) {
     console.error(`[Pipeline Error] Failed to fetch repository details for ${owner}/${repo}:`, error.message);

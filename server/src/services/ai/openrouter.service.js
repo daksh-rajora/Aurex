@@ -2,37 +2,55 @@ import axios from 'axios';
 import ApiError from '../../utils/ApiError.js';
 
 /**
- * Helper to ensure a value is strictly a Number between 0 and 100.
+ * Secret / Ignored files check according to Requirement 6:
+ * Ignore: .env, .env.*, private keys, API keys, tokens, credentials, node_modules, .git, dist, build, coverage, binary/media files
  */
-const ensureNumber = (val, fallback = 90) => {
-  if (typeof val === 'number' && !isNaN(val)) {
-    return Math.min(100, Math.max(0, Math.round(val)));
-  }
-  if (typeof val === 'string') {
-    const parsed = parseInt(val, 10);
-    if (!isNaN(parsed)) {
-      return Math.min(100, Math.max(0, parsed));
-    }
-  }
-  return fallback;
-};
+export const isIgnoredFile = (filePath) => {
+  if (!filePath) return true;
+  const lower = filePath.toLowerCase();
+  const basename = filePath.split('/').pop().toLowerCase();
 
-/**
- * Helper to ensure a value is strictly a String.
- */
-const ensureString = (val, fallback = '') => {
-  if (typeof val === 'string') {
-    return val.trim();
+  // Ignored secrets & credentials
+  if (
+    basename.startsWith('.env') ||
+    basename.includes('secret') ||
+    basename.includes('id_rsa') ||
+    basename.endsWith('.pem') ||
+    basename.endsWith('.key') ||
+    basename.includes('token') ||
+    basename.includes('credentials')
+  ) {
+    return true;
   }
-  if (val && typeof val === 'object') {
-    if (typeof val.review === 'string') return val.review.trim();
-    if (typeof val.text === 'string') return val.text.trim();
-    return JSON.stringify(val);
+
+  // Ignored directories
+  if (
+    lower.startsWith('node_modules/') ||
+    lower.startsWith('.git/') ||
+    lower.startsWith('dist/') ||
+    lower.startsWith('build/') ||
+    lower.startsWith('coverage/') ||
+    lower.includes('/node_modules/') ||
+    lower.includes('/.git/') ||
+    lower.includes('/dist/') ||
+    lower.includes('/build/') ||
+    lower.includes('/coverage/')
+  ) {
+    return true;
   }
-  if (val !== undefined && val !== null) {
-    return String(val).trim();
+
+  // Binary & Media Extensions
+  const binaryExtensions = [
+    '.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', '.webp', '.avif',
+    '.zip', '.tar', '.gz', '.7z', '.pdf', '.mp4', '.mp3', '.mov',
+    '.woff', '.woff2', '.ttf', '.eot', '.lock', '.exe', '.dll', '.so', '.dylib', '.jar'
+  ];
+
+  if (binaryExtensions.some((ext) => lower.endsWith(ext))) {
+    return true;
   }
-  return fallback;
+
+  return false;
 };
 
 /**
@@ -48,22 +66,203 @@ const cleanJsonText = (text) => {
 };
 
 /**
- * Basic OpenRouter API connection test function using axios.
+ * Validates that the AI response matches EXACTLY the required schema and type structure.
+ * Throws an error if invalid JSON or invalid schema is encountered (No fake/default data!).
+ */
+export const validateAndSanitizeAnalysisSchema = (data) => {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('AI response is not a valid JSON object');
+  }
+
+  const scoreKeys = [
+    'overallScore',
+    'codeQuality',
+    'documentation',
+    'architecture',
+    'maintainability',
+    'security',
+    'performance',
+    'bestPractices',
+  ];
+
+  const stringKeys = [
+    'architectureReview',
+    'codeQualityReview',
+    'documentationReview',
+    'securityReview',
+    'performanceReview',
+    'maintainabilityReview',
+    'bestPracticesReview',
+    'summary',
+  ];
+
+  const arrayKeys = [
+    'techStack',
+    'strengths',
+    'weaknesses',
+    'suggestions',
+    'recommendations',
+  ];
+
+  const validated = {};
+
+  // 1. Validate Numeric Scores (0-100)
+  for (const key of scoreKeys) {
+    let val = data[key];
+    if (typeof val === 'string') {
+      val = parseInt(val, 10);
+    }
+    if (typeof val !== 'number' || isNaN(val) || val < 0 || val > 100) {
+      throw new Error(`Invalid schema: field "${key}" must be a number between 0 and 100. Received: ${data[key]}`);
+    }
+    validated[key] = Math.round(val);
+  }
+
+  // 2. Validate Text Reviews (strings)
+  for (const key of stringKeys) {
+    let val = data[key];
+    if (typeof val !== 'string') {
+      throw new Error(`Invalid schema: field "${key}" must be a string. Received: ${typeof val}`);
+    }
+    validated[key] = val.trim();
+  }
+
+  // 3. Validate String Arrays
+  for (const key of arrayKeys) {
+    let val = data[key];
+    if (key === 'techStack' && !val && Array.isArray(data.technologyStack)) {
+      val = data.technologyStack;
+    }
+    if (!Array.isArray(val)) {
+      throw new Error(`Invalid schema: field "${key}" must be an array of strings. Received: ${typeof val}`);
+    }
+    validated[key] = val.map((item) => (typeof item === 'string' ? item.trim() : String(item)));
+  }
+
+  return validated;
+};
+
+/**
+ * Builds high-context, secret-filtered prompt for OpenRouter AI model.
+ */
+export const buildRepositoryAnalysisPrompt = (repoData) => {
+  if (typeof repoData === 'string') return repoData;
+  const name = repoData.name || repoData.fullName || 'Repository';
+  const description = repoData.description || 'No description provided.';
+  const readme = repoData.readme?.content
+    ? String(repoData.readme.content).slice(0, 3500)
+    : typeof repoData.readme === 'string'
+    ? repoData.readme.slice(0, 3500)
+    : 'No README file content available.';
+
+  const languages = Array.isArray(repoData.languages)
+    ? repoData.languages.join(', ')
+    : typeof repoData.languages === 'object'
+    ? Object.keys(repoData.languages).join(', ')
+    : repoData.language || 'TypeScript';
+
+  const topics = Array.isArray(repoData.topics) && repoData.topics.length > 0
+    ? repoData.topics.join(', ')
+    : 'None';
+
+  const stars = repoData.stars ?? repoData.stargazers_count ?? 0;
+  const forks = repoData.forks ?? repoData.forks_count ?? 0;
+  const license = repoData.license || 'MIT';
+  const defaultBranch = repoData.defaultBranch || repoData.default_branch || 'main';
+
+  const folderStructure = Array.isArray(repoData.rootContents)
+    ? repoData.rootContents
+        .filter((item) => !isIgnoredFile(item.path || item.name))
+        .map((item) => `${item.type === 'dir' ? '[DIR]' : '[FILE]'} ${item.name}`)
+        .join('\n')
+    : repoData.folderStructure || 'No directory structure recorded.';
+
+  // Build source files context if available
+  let sourceFilesContext = '';
+  if (Array.isArray(repoData.sourceFiles) && repoData.sourceFiles.length > 0) {
+    sourceFilesContext = '\n=== RELEVANT SOURCE & CONFIGURATION FILES ===\n' +
+      repoData.sourceFiles
+        .filter((f) => !isIgnoredFile(f.path))
+        .map((f) => `--- FILE: ${f.path} ---\n${f.content.slice(0, 2000)}\n`)
+        .join('\n');
+  }
+
+  return `
+You are a Senior Software Architect and AI Technical Auditor for Aurex AI.
+Perform an in-depth repository review based on the following actual repository data:
+
+=== REPOSITORY METADATA ===
+Repository Name: ${name}
+Description: ${description}
+Primary Languages: ${languages}
+Topics: ${topics}
+Stars: ${stars}
+Forks: ${forks}
+License: ${license}
+Default Branch: ${defaultBranch}
+
+=== FOLDER & DIRECTORY STRUCTURE ===
+${folderStructure}
+
+=== README DOCUMENTATION ===
+"${readme}"
+${sourceFilesContext}
+
+=== OUTPUT INSTRUCTIONS ===
+Evaluate the repository and return ONLY a valid raw JSON object matching EXACTLY the following structure (no markdown code blocks, no prose):
+
+{
+  "overallScore": 85,
+  "codeQuality": 88,
+  "documentation": 80,
+  "architecture": 87,
+  "maintainability": 86,
+  "security": 90,
+  "performance": 85,
+  "bestPractices": 88,
+  "techStack": ["JavaScript", "Node.js", "Express", "MongoDB"],
+  "architectureReview": "Detailed evaluation of directory layout and architecture.",
+  "codeQualityReview": "Assessment of maintainability, language standards, and conventions.",
+  "documentationReview": "Evaluation of README quality and setup instructions.",
+  "securityReview": "Analysis of security risks and dependency safety.",
+  "performanceReview": "Assessment of runtime efficiency and performance.",
+  "maintainabilityReview": "Evaluation of modularity and code maintainability.",
+  "bestPracticesReview": "Adherence to software engineering standards.",
+  "strengths": ["Key strength point 1", "Key strength point 2"],
+  "weaknesses": ["Area for improvement 1"],
+  "suggestions": ["Actionable suggestion 1"],
+  "recommendations": ["Actionable recommendation 1"],
+  "summary": "Executive summary of the repository."
+}
+
+Rules:
+- All score fields MUST be numbers between 0 and 100.
+- All review fields and summary MUST be strings.
+- techStack, strengths, weaknesses, suggestions, and recommendations MUST be arrays of strings.
+`;
+};
+
+// Export buildGeminiAnalysisPrompt alias for backward compatibility
+export const buildGeminiAnalysisPrompt = buildRepositoryAnalysisPrompt;
+
+/**
+ * Basic OpenRouter API connection test function.
  */
 export const testOpenRouterConnection = async () => {
   const apiKey = process.env.OPENROUTER_API_KEY;
+  const model = process.env.OPENROUTER_MODEL || 'qwen/qwen3-coder-next';
 
   if (!apiKey) {
     throw new ApiError(500, 'OPENROUTER_API_KEY is not configured in environment variables');
   }
 
-  console.log("Using OpenRouter Model:", process.env.OPENROUTER_MODEL);
+  console.log(`[AI] Model: ${model}`);
 
   try {
     const response = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
-        model: process.env.OPENROUTER_MODEL,
+        model,
         messages: [
           {
             role: 'user',
@@ -82,15 +281,8 @@ export const testOpenRouterConnection = async () => {
       }
     );
 
-    console.log("Actual model used:", response.data.model);
-
     const text = response.data.choices?.[0]?.message?.content;
-
-    if (!text) {
-      return 'Hello from OpenRouter';
-    }
-
-    return text.trim();
+    return text ? text.trim() : 'Hello from OpenRouter';
   } catch (error) {
     const errMsg =
       error.response?.data?.error?.message ||
@@ -101,176 +293,43 @@ export const testOpenRouterConnection = async () => {
     if (error instanceof ApiError) {
       throw error;
     }
-
-    throw new ApiError(
-      error.response?.status || 500,
-      errMsg
-    );
+    throw new ApiError(error.response?.status || 500, errMsg);
   }
 };
 
 /**
- * Builds a structured, high-context prompt for repository analysis.
- * Kept exactly identical to the original repository analysis prompt.
- */
-export const buildRepositoryAnalysisPrompt = (repoData) => {
-  if (typeof repoData === 'string') return repoData;
-  const name = repoData.name || repoData.fullName || 'Repository';
-  const description = repoData.description || 'No description provided.';
-  const readme = repoData.readme?.content ? String(repoData.readme.content).slice(0, 3500) : typeof repoData.readme === 'string' ? repoData.readme.slice(0, 3500) : 'No README file content available.';
-  const languages = Array.isArray(repoData.languages)
-    ? repoData.languages.join(', ')
-    : typeof repoData.languages === 'object'
-    ? Object.keys(repoData.languages).join(', ')
-    : repoData.language || 'TypeScript';
-
-  const topics = Array.isArray(repoData.topics) && repoData.topics.length > 0
-    ? repoData.topics.join(', ')
-    : 'None';
-
-  const stars = repoData.stars ?? repoData.stargazers_count ?? 0;
-  const forks = repoData.forks ?? repoData.forks_count ?? 0;
-  const license = repoData.license || 'MIT';
-  const defaultBranch = repoData.defaultBranch || repoData.default_branch || 'main';
-
-  const folderStructure = Array.isArray(repoData.rootContents || repoData.folderStructure)
-    ? (repoData.rootContents || repoData.folderStructure)
-        .map((item) => (typeof item === 'string' ? item : `${item.type === 'dir' ? '[DIR]' : '[FILE]'} ${item.name}`))
-        .join('\n')
-    : repoData.folderStructure || 'No directory structure recorded.';
-
-  return `
-You are a Senior Software Architect and AI Technical Auditor for Aurex AI.
-Perform an in-depth repository review based on the following metadata:
-
-=== REPOSITORY METADATA ===
-Repository Name: ${name}
-Description: ${description}
-Primary Languages: ${languages}
-Topics: ${topics}
-Stars: ${stars}
-Forks: ${forks}
-License: ${license}
-Default Branch: ${defaultBranch}
-
-=== FOLDER & DIRECTORY STRUCTURE ===
-${folderStructure}
-
-=== README DOCUMENTATION ===
-"${readme}"
-
-=== OUTPUT INSTRUCTIONS ===
-Evaluate the repository and return ONLY a raw valid JSON object matching EXACTLY the following structure (no markdown wrappers, no prose explanations):
-
-{
-  "overallScore": 94,
-  "codeQuality": 91,
-  "documentation": 88,
-  "architecture": 95,
-  "maintainability": 92,
-  "security": 93,
-  "performance": 90,
-  "bestPractices": 91,
-
-  "architectureReview": "Detailed assessment of directory structure, module separation, and project layout.",
-  "codeQualityReview": "Assessment of maintainability, language standards, and coding conventions.",
-  "documentationReview": "Evaluation of setup clarity, API documentation, and README completeness.",
-  "securityReview": "Analysis of potential security risks, dependency safety, and sensitive file checks.",
-  "performanceReview": "Assessment of technology efficiency, bundling overhead, and execution paths.",
-  "maintainabilityReview": "Evaluation of code modularity, separation of concerns, and ease of future refactoring.",
-  "bestPracticesReview": "Adherence to industry software engineering best practices.",
-
-  "summary": "Concise executive summary covering project quality, security posture, and readiness.",
-  "technologyStack": ["TypeScript", "React", "Node.js", "Express", "Tailwind CSS"],
-  "strengths": [
-    "Key repository strength point 1",
-    "Key repository strength point 2"
-  ],
-  "weaknesses": [
-    "Area for improvement 1",
-    "Area for improvement 2"
-  ],
-  "recommendations": [
-    "Actionable improvement recommendation 1",
-    "Actionable improvement recommendation 2"
-  ]
-}
-`;
-};
-
-// Export buildGeminiAnalysisPrompt alias for backward compatibility if imported elsewhere
-export const buildGeminiAnalysisPrompt = buildRepositoryAnalysisPrompt;
-
-/**
- * Dynamic fallback analysis generator when API Key is absent or request fails gracefully.
- */
-export const generateFallbackData = (repoData) => {
-  const name = typeof repoData === 'object' ? (repoData?.name || repoData?.fullName || 'Repository') : 'Repository';
-  const lang = typeof repoData === 'object' ? (repoData?.language || (Array.isArray(repoData?.languages) ? repoData.languages[0] : 'TypeScript')) : 'TypeScript';
-
-  return {
-    overallScore: 94,
-    codeQuality: 91,
-    documentation: 88,
-    architecture: 95,
-    maintainability: 92,
-    security: 93,
-    performance: 90,
-    bestPractices: 91,
-
-    architectureReview: 'Clean separation of concerns with isolated controllers, services, and route handlers.',
-    codeQualityReview: `Adheres strictly to modern ${lang} syntax, conventions, and type safety standards.`,
-    documentationReview: 'README provides setup instructions, dependency config, and environmental variables guide.',
-    securityReview: 'No critical security risks or exposed credentials detected in repository tree.',
-    performanceReview: 'Low memory overhead and efficient execution paths with proper async handling.',
-    maintainabilityReview: 'High maintainability index due to clear separation of concerns across layers.',
-    bestPracticesReview: 'Follows RESTful architectural conventions and structured error handling patterns.',
-
-    summary: `Automated AI analysis completed for ${name}. Overall codebase health score is 94/100 (Grade A+) with clean architecture, zero high-severity CVEs, and robust type safety conventions.`,
-    technologyStack: [lang, 'React', 'Node.js', 'Express', 'Tailwind CSS'],
-    strengths: [
-      `Comprehensive type safety and modern language standards in ${lang}`,
-      'Modular directory layout with isolated business logic services',
-      'Zero high-severity vulnerability CVEs in primary dependencies',
-    ],
-    weaknesses: [
-      'Additional inline JSDoc comments recommended for utility scripts',
-      'Unit test coverage can be expanded further to achieve >85% coverage',
-    ],
-    recommendations: [
-      'Add automated PR linting checks with Oxlint / ESLint in CI pipeline',
-      'Implement response caching for high-frequency database read calls',
-      'Configure automated Dependabot security alerts for npm dependencies',
-    ],
-  };
-};
-
-/**
- * Repository analysis function using OpenRouter Chat Completions API.
+ * Repository analysis function using OpenRouter Chat Completions API with Qwen3 Coder Next.
  *
  * @param {Object|string} repositoryData - Repository metadata object or prompt
- * @returns {Promise<Object>} Structured JSON analysis result with validated types
+ * @returns {Promise<Object>} Validated JSON analysis result
  */
 export const generateRepositoryAnalysis = async (repositoryData) => {
   const apiKey = process.env.OPENROUTER_API_KEY;
+  const model = process.env.OPENROUTER_MODEL || 'qwen/qwen3-coder-next';
+
+  console.log('[AI] OpenRouter analysis started');
+  console.log(`[AI] Model: ${model}`);
 
   if (!apiKey) {
-    throw new ApiError(500, 'OPENROUTER_API_KEY is not configured in environment variables');
+    const err = new ApiError(500, 'OPENROUTER_API_KEY is not configured in environment variables');
+    console.error(`[AI Error] ${err.message}`);
+    throw err;
   }
 
   const finalPrompt = buildRepositoryAnalysisPrompt(repositoryData);
-
-  console.log("Using OpenRouter Model:", process.env.OPENROUTER_MODEL);
+  console.log('[AI] Repository context prepared');
 
   try {
+    console.log('[AI] Sending repository context to OpenRouter');
+
     const response = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
-        model: process.env.OPENROUTER_MODEL,
+        model,
         messages: [
           {
             role: 'system',
-            content: 'You are an expert senior software architect and code reviewer. Always return valid JSON only.',
+            content: 'You are an expert senior software architect and code reviewer. Always return valid JSON matching the exact requested schema only.',
           },
           {
             role: 'user',
@@ -278,6 +337,8 @@ export const generateRepositoryAnalysis = async (repositoryData) => {
           },
         ],
         temperature: 0.2,
+        max_tokens: 2000,
+        response_format: { type: 'json_object' },
       },
       {
         headers: {
@@ -290,14 +351,12 @@ export const generateRepositoryAnalysis = async (repositoryData) => {
       }
     );
 
-    console.log("Actual model used:", response.data.model);
+    console.log('[AI] OpenRouter response received');
 
     const responseText = response.data.choices?.[0]?.message?.content;
 
     if (!responseText) {
-      const emptyError = new ApiError(500, 'Empty response received from OpenRouter API');
-      emptyError.rawResponse = JSON.stringify(response.data || {});
-      throw emptyError;
+      throw new ApiError(500, 'Empty response content received from OpenRouter API');
     }
 
     const cleanedText = cleanJsonText(responseText);
@@ -305,45 +364,18 @@ export const generateRepositoryAnalysis = async (repositoryData) => {
     let parsed;
     try {
       parsed = JSON.parse(cleanedText);
-      console.log('[Pipeline] JSON parsed successfully from OpenRouter response');
     } catch (parseError) {
-      console.error('[Pipeline Error] JSON parsing failed from OpenRouter!');
-      console.error('[Pipeline RAW Response]:', responseText);
-      const invalidJsonError = new ApiError(500, `Failed to parse OpenRouter JSON response: ${parseError.message}`);
-      invalidJsonError.rawResponse = typeof response.data === 'object' ? JSON.stringify(response.data) : String(responseText);
-      throw invalidJsonError;
+      console.error('[AI Error] JSON parsing failed from OpenRouter response:', parseError.message);
+      throw new ApiError(500, `Failed to parse OpenRouter JSON response: ${parseError.message}`);
     }
 
-    // STRICT TYPE VALIDATION & SANITIZATION (Mapping into MongoDB Analysis schema)
-    return {
-      // Numeric Scores
-      overallScore: ensureNumber(parsed.overallScore, 94),
-      codeQuality: ensureNumber(parsed.codeQuality, 91),
-      documentation: ensureNumber(parsed.documentation, 88),
-      architecture: ensureNumber(parsed.architecture, 95),
-      maintainability: ensureNumber(parsed.maintainability, 92),
-      security: ensureNumber(parsed.security, 93),
-      performance: ensureNumber(parsed.performance, 90),
-      bestPractices: ensureNumber(parsed.bestPractices, 91),
+    // STRICT TYPE & SCHEMA VALIDATION (Requirement 8 & 9)
+    const validatedData = validateAndSanitizeAnalysisSchema(parsed);
+    console.log('[AI] Analysis validated');
 
-      // Text Reviews
-      architectureReview: ensureString(parsed.architectureReview, 'Clean architecture and directory structure.'),
-      codeQualityReview: ensureString(parsed.codeQualityReview, 'Adheres to language idioms and clean code standards.'),
-      documentationReview: ensureString(parsed.documentationReview, 'README provides setup instructions.'),
-      securityReview: ensureString(parsed.securityReview, 'Zero critical security vulnerabilities detected.'),
-      performanceReview: ensureString(parsed.performanceReview, 'Optimized bundle size and low memory overhead.'),
-      maintainabilityReview: ensureString(parsed.maintainabilityReview, 'High maintainability index with clear layer separation.'),
-      bestPracticesReview: ensureString(parsed.bestPracticesReview, 'Follows modern software design patterns.'),
-
-      // Summaries & Arrays
-      summary: ensureString(parsed.summary, 'Repository analysis completed successfully.'),
-      technologyStack: Array.isArray(parsed.technologyStack) ? parsed.technologyStack : Array.isArray(parsed.techStack) ? parsed.techStack : ['TypeScript'],
-      strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
-      weaknesses: Array.isArray(parsed.weaknesses) ? parsed.weaknesses : [],
-      recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
-    };
+    return validatedData;
   } catch (error) {
-    console.error('[Pipeline Error] OpenRouter API execution failed:');
+    console.error('[AI Error] OpenRouter API execution failed:');
     const exactMessage =
       error.response?.data?.error?.message ||
       error.response?.data?.message ||
@@ -363,4 +395,5 @@ export default {
   generateRepositoryAnalysis,
   buildRepositoryAnalysisPrompt,
   buildGeminiAnalysisPrompt,
+  validateAndSanitizeAnalysisSchema,
 };

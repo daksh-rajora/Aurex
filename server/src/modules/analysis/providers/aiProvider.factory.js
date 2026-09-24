@@ -106,8 +106,8 @@ export const executeAIAnalysis = async (prompt, overrideProvider) => {
   try {
     return await providerFn(prompt);
   } catch (err) {
-    console.warn(`[AI Provider] ${providerName} request failed (${err.message}). Using fallback AI engine.`);
-    return generateFallbackAnalysis(prompt);
+    console.error(`[AI Provider Error] ${providerName} request failed: ${err.message}`);
+    throw err;
   }
 };
 

@@ -81,11 +81,11 @@ export const runAIAnalysisService = async ({ userId, analysisId }) => {
 
       // Arrays & Summary
       summary: aiResult.summary,
-      techStack: aiResult.technologyStack,
+      techStack: aiResult.techStack || aiResult.technologyStack || [],
       strengths: aiResult.strengths,
       weaknesses: aiResult.weaknesses,
       recommendations: aiResult.recommendations,
-      suggestions: aiResult.recommendations,
+      suggestions: aiResult.suggestions || aiResult.recommendations,
     };
 
     // Emit Stage 92%
@@ -99,6 +99,7 @@ export const runAIAnalysisService = async ({ userId, analysisId }) => {
     analysisDoc.errorMessage = '';
 
     await analysisDoc.save();
+    console.log('[AI] Analysis saved successfully');
 
     // Emit Stage 100%
     emitAnalysisProgress({

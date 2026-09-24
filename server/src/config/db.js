@@ -1,33 +1,58 @@
 import mongoose from 'mongoose';
-import config from './config.js';
 
 /**
  * Establishes connection to MongoDB database
  */
+let isConnecting = false;
+
 export const connectDB = async () => {
+  // Prevent application from repeatedly creating uncontrolled MongoDB connections
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+  if (isConnecting || mongoose.connection.readyState === 2) {
+    return;
+  }
+
+  const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
+
+  if (!mongoUri) {
+    const errorMsg = 'MongoDB connection error: MONGODB_URI/MONGO_URI environment variable is missing.';
+    console.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
   try {
-    // Enable Mongoose query debugging in development
-    if (config.env === 'development') {
+    isConnecting = true;
+
+    if (process.env.NODE_ENV === 'development') {
       mongoose.set('debug', true);
     }
 
     console.log('Connecting to MongoDB...');
-    const conn = await mongoose.connect(config.mongoUri, {
-      serverSelectionTimeoutMS: 5000,
+    const conn = await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 10000,
     });
 
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
+    console.log(`MongoDB connected successfully: ${conn.connection.host}`);
+    return conn;
   } catch (error) {
     console.error(`MongoDB connection error: ${error.message}`);
-    throw error; // Propagate error to let server.js handle it
+    throw error;
+  } finally {
+    isConnecting = false;
   }
 };
 
 // Monitor connection events
 mongoose.connection.on('disconnected', () => {
-  console.warn('MongoDB connection lost! Attempting to reconnect...');
+  console.warn('MongoDB connection lost');
+});
+
+mongoose.connection.on('reconnected', () => {
+  console.log('MongoDB reconnected');
 });
 
 mongoose.connection.on('error', (err) => {
-  console.error(`MongoDB background connection error: ${err.message}`);
+  console.error(`MongoDB connection error: ${err.message}`);
 });

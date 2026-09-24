@@ -1,42 +1,40 @@
 import { body, validationResult } from 'express-validator';
 
 /**
- * Express-validator rules for user login.
+ * Express-validator rules for user login using email and password.
  */
 export const loginValidatorRules = [
-  body('emailOrUsername')
+  body('email')
     .trim()
     .notEmpty()
-    .withMessage('Email or username is required')
-    .isLength({ min: 3, max: 100 })
-    .withMessage('Email or username must be between 3 and 100 characters'),
+    .withMessage('Please enter your email')
+    .isEmail()
+    .withMessage('Please enter a valid email'),
 
   body('password')
     .notEmpty()
-    .withMessage('Password is required')
-    .isLength({ min: 8 })
-    .withMessage('Password must be at least 8 characters long'),
+    .withMessage('Please enter your password'),
 ];
 
 /**
- * Reusable validation middleware to catch and format express-validator errors.
- *
- * @param {import('express').Request} req - Express request object
- * @param {import('express').Response} res - Express response object
- * @param {import('express').NextFunction} next - Express next function
+ * Validation middleware to catch and format express-validator errors.
  */
 export const validate = (req, res, next) => {
   const errors = validationResult(req);
 
   if (!errors.isEmpty()) {
-    const formattedErrors = errors.array().map((err) => ({
+    const errorArray = errors.array();
+    const firstError = errorArray[0];
+
+    const formattedErrors = errorArray.map((err) => ({
       field: err.path || err.param,
       message: err.msg,
     }));
 
     return res.status(400).json({
       success: false,
-      message: 'Validation failed',
+      message: firstError.msg,
+      field: firstError.path || firstError.param,
       errors: formattedErrors,
     });
   }
@@ -45,7 +43,7 @@ export const validate = (req, res, next) => {
 };
 
 /**
- * Combined login validation middleware array.
+ * Combined login validation middleware.
  */
 export const loginValidator = [...loginValidatorRules, validate];
 
