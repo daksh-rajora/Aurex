@@ -25,6 +25,7 @@ export const RepoCard = ({
   onViewDetails,
   onAnalyze,
   onToggleFavorite,
+  isTogglingFav = false,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -115,7 +116,8 @@ export const RepoCard = ({
             {/* Favorite Star Toggle */}
             <button
               onClick={() => onToggleFavorite(repo)}
-              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+              disabled={isTogglingFav}
+              className={`p-1.5 rounded-lg border transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                 repo.isFavorite
                   ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 hover:bg-amber-500/25'
                   : 'bg-[#141B2D] border-[#2A3247] text-slate-400 hover:text-amber-400 hover:border-slate-600'

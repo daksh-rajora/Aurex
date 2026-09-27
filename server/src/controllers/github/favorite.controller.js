@@ -29,14 +29,20 @@ export const toggleFavorite = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Repository ID or full name is required');
   }
 
-  const targetRepoId = String(repositoryId || fullName);
+  const targetRepoId = String(repositoryId || fullName || '').trim();
   const targetRepoName = name || (fullName ? fullName.split('/')[1] : 'repository');
-  const targetFullName = fullName || `${owner || 'owner'}/${targetRepoName}`;
+  const targetFullName = String(fullName || `${owner || 'owner'}/${targetRepoName}`).trim();
+
+  // Escaped regex pattern for exact case-insensitive full name matching
+  const escapedFullNamePattern = targetFullName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   // Check if repository is already favorited by this user
   const existingFavorite = await Favorite.findOne({
     user: userId,
-    $or: [{ repositoryId: targetRepoId }, { fullName: targetFullName }],
+    $or: [
+      { repositoryId: targetRepoId },
+      { fullName: { $regex: new RegExp(`^${escapedFullNamePattern}$`, 'i') } },
+    ],
   });
 
   if (existingFavorite) {

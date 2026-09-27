@@ -6,6 +6,7 @@ export const RepoGrid = ({
   onViewDetails,
   onAnalyze,
   onToggleFavorite,
+  togglingFavIds = new Set(),
 }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -17,6 +18,10 @@ export const RepoGrid = ({
             onViewDetails={onViewDetails}
             onAnalyze={onAnalyze}
             onToggleFavorite={onToggleFavorite}
+            isTogglingFav={
+              togglingFavIds.has(String(repo.id)) ||
+              togglingFavIds.has(repo.fullName)
+            }
           />
         ))}
       </AnimatePresence>

@@ -170,29 +170,33 @@ export const RepositoriesPage = () => {
     return filteredRepositories.slice(start, start + itemsPerPage);
   }, [filteredRepositories, currentPage, itemsPerPage]);
 
+  const [togglingFavIds, setTogglingFavIds] = useState(new Set());
+
   const handleToggleFavorite = async (targetRepo) => {
     if (!targetRepo) return;
 
     const repoId = String(targetRepo.id || targetRepo.fullName);
-    const repoName = targetRepo.name || targetRepo.fullName?.split('/')[1] || targetRepo.fullName;
+    const repoFullName = targetRepo.fullName || `${targetRepo.owner?.login || 'owner'}/${targetRepo.name}`;
 
-    // Optimistic UI state update based strictly on clicked targetRepo
-    setRepositories((prev) =>
-      prev.map((r) => {
-        if (String(r.id) === repoId || r.fullName === targetRepo.fullName) {
-          return { ...r, isFavorite: !r.isFavorite };
-        }
-        return r;
-      })
-    );
+    // Prevent concurrent toggle requests for the same repository
+    if (togglingFavIds.has(repoId) || togglingFavIds.has(repoFullName)) return;
+
+    setTogglingFavIds((prev) => {
+      const next = new Set(prev);
+      next.add(repoId);
+      next.add(repoFullName);
+      return next;
+    });
+
+    const repoName = targetRepo.name || repoFullName.split('/')[1] || repoFullName;
 
     try {
       const payload = {
         repositoryId: repoId,
         name: repoName,
-        fullName: targetRepo.fullName || `${targetRepo.owner?.login || 'owner'}/${repoName}`,
+        fullName: repoFullName,
         owner: targetRepo.owner?.login || targetRepo.owner || 'owner',
-        githubUrl: targetRepo.url || targetRepo.htmlUrl || `https://github.com/${targetRepo.fullName}`,
+        githubUrl: targetRepo.url || targetRepo.htmlUrl || `https://github.com/${repoFullName}`,
         language: targetRepo.language || 'TypeScript',
         stars: targetRepo.stars || 0,
         forks: targetRepo.forks || 0,
@@ -200,25 +204,37 @@ export const RepositoriesPage = () => {
       };
 
       const res = await githubService.toggleFavoriteApi(payload);
-      const isFav = res?.data?.isFavorite ?? res?.isFavorite;
+
+      // Backend API response is the single source of truth for the final state
+      const finalFavoriteState = Boolean(res?.data?.isFavorite ?? res?.isFavorite);
       const displayName = res?.data?.repositoryName || res?.repositoryName || repoName;
 
-      toast.success(
-        isFav ? `Added ${displayName} to Favorites` : `Removed ${displayName} from Favorites`,
-        { icon: '⭐' }
-      );
-    } catch (err) {
-      console.error('Failed to update favorite status on server:', err);
-      // Revert optimistic update on failure
+      // Update UI state to match final backend state
       setRepositories((prev) =>
         prev.map((r) => {
-          if (String(r.id) === repoId || r.fullName === targetRepo.fullName) {
-            return { ...r, isFavorite: !r.isFavorite };
+          if (String(r.id) === repoId || r.fullName === repoFullName) {
+            return { ...r, isFavorite: finalFavoriteState };
           }
           return r;
         })
       );
+
+      // Show toast strictly matching final backend state
+      if (finalFavoriteState) {
+        toast.success(`Added ${displayName} to Favorites`, { icon: '⭐' });
+      } else {
+        toast.success(`Removed ${displayName} from Favorites`, { icon: '⭐' });
+      }
+    } catch (err) {
+      console.error('Failed to update favorite status on server:', err);
       toast.error(err.response?.data?.message || err.message || 'Failed to update favorite status');
+    } finally {
+      setTogglingFavIds((prev) => {
+        const next = new Set(prev);
+        next.delete(repoId);
+        next.delete(repoFullName);
+        return next;
+      });
     }
   };
 
@@ -418,6 +434,7 @@ export const RepositoriesPage = () => {
             onViewDetails={(repo) => setSelectedDrawerRepo(repo)}
             onAnalyze={(repo) => setAnalyzeModalRepo(repo)}
             onToggleFavorite={handleToggleFavorite}
+            togglingFavIds={togglingFavIds}
           />
 
           {/* Pagination Controls */}
