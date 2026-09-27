@@ -38,14 +38,29 @@ export const RepositoriesPage = () => {
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [activeAnalysisLoading, setActiveAnalysisLoading] = useState(null); // { repo, analysisId }
 
-  // Fetch real repositories from backend
+  // Fetch real repositories from backend and sync favorite status from MongoDB
   const fetchRepositories = useCallback(async (showSkeleton = true) => {
     if (showSkeleton) setIsLoading(true);
     setErrorMessage(null);
 
     try {
-      const data = await githubService.getRepositories();
-      setRepositories(data);
+      const [data, favList] = await Promise.all([
+        githubService.getRepositories(),
+        githubService.getFavoritesApi().catch(() => []),
+      ]);
+
+      const favSet = new Set(
+        Array.isArray(favList)
+          ? favList.map((f) => String(f.repositoryId || f.fullName))
+          : []
+      );
+
+      const merged = data.map((repo) => ({
+        ...repo,
+        isFavorite: favSet.has(String(repo.id)) || favSet.has(repo.fullName),
+      }));
+
+      setRepositories(merged);
       setIsGithubConnected(true);
     } catch (error) {
       console.error('Failed to fetch repositories:', error);
@@ -78,7 +93,42 @@ export const RepositoriesPage = () => {
     toast.success('Repositories re-synchronized with backend API!');
   };
 
-  // Search filtering by Name and Description
+  // Robust Language Normalization and Matching Helper
+  const matchesLanguageFilter = (repoLanguage, filterLanguage) => {
+    if (!filterLanguage || filterLanguage === 'All' || filterLanguage === 'All Languages') {
+      return true;
+    }
+    if (!repoLanguage) return false;
+
+    const normalize = (val) => {
+      const lower = String(val).trim().toLowerCase();
+      if (lower === 'js') return 'javascript';
+      if (lower === 'ts') return 'typescript';
+      if (lower === 'py') return 'python';
+      if (lower === 'cpp') return 'c++';
+      if (lower === 'cs' || lower === 'csharp') return 'c#';
+      if (lower === 'sh' || lower === 'bash') return 'shell';
+      if (lower === 'pwsh') return 'powershell';
+      if (lower === 'objc') return 'objective-c';
+      return lower;
+    };
+
+    const repoNorm = normalize(repoLanguage);
+    const filterNorm = normalize(filterLanguage);
+
+    if (repoNorm === filterNorm) return true;
+
+    // Handle hybrid or legacy tags like 'HTML/CSS'
+    if (repoNorm === 'html/css') {
+      if (filterNorm === 'html' || filterNorm === 'css' || filterNorm === 'html/css') {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  // Search filtering by Name, Description, Language and Visibility
   const filteredRepositories = useMemo(() => {
     return repositories
       .filter((repo) => {
@@ -86,13 +136,11 @@ export const RepositoriesPage = () => {
         const matchesSearch =
           !q ||
           repo.name.toLowerCase().includes(q) ||
-          repo.fullName.toLowerCase().includes(q) ||
-          repo.description.toLowerCase().includes(q) ||
-          repo.topics.some((t) => t.toLowerCase().includes(q));
+          (repo.fullName && repo.fullName.toLowerCase().includes(q)) ||
+          (repo.description && repo.description.toLowerCase().includes(q)) ||
+          (Array.isArray(repo.topics) && repo.topics.some((t) => t.toLowerCase().includes(q)));
 
-        const matchesLanguage =
-          selectedLanguage === 'All' ||
-          repo.language.toLowerCase() === selectedLanguage.toLowerCase();
+        const matchesLanguage = matchesLanguageFilter(repo.language, selectedLanguage);
 
         const matchesVisibility =
           selectedVisibility === 'All' ||
@@ -103,11 +151,11 @@ export const RepositoriesPage = () => {
       })
       .sort((a, b) => {
         if (selectedSort === 'Stars') {
-          return b.stars - a.stars;
+          return (b.stars || 0) - (a.stars || 0);
         } else if (selectedSort === 'Name') {
           return a.name.localeCompare(b.name);
         } else {
-          return a.id.localeCompare(b.id);
+          return String(a.id).localeCompare(String(b.id));
         }
       });
   }, [repositories, searchQuery, selectedLanguage, selectedVisibility, selectedSort]);
@@ -122,20 +170,56 @@ export const RepositoriesPage = () => {
     return filteredRepositories.slice(start, start + itemsPerPage);
   }, [filteredRepositories, currentPage, itemsPerPage]);
 
-  const handleToggleFavorite = (repoId) => {
+  const handleToggleFavorite = async (targetRepo) => {
+    if (!targetRepo) return;
+
+    const repoId = String(targetRepo.id || targetRepo.fullName);
+    const repoName = targetRepo.name || targetRepo.fullName?.split('/')[1] || targetRepo.fullName;
+
+    // Optimistic UI state update based strictly on clicked targetRepo
     setRepositories((prev) =>
-      prev.map((repo) => {
-        if (repo.id === repoId) {
-          const updated = !repo.isFavorite;
-          toast.success(
-            updated ? `Added ${repo.name} to Favorites` : `Removed ${repo.name} from Favorites`,
-            { icon: '⭐' }
-          );
-          return { ...repo, isFavorite: updated };
+      prev.map((r) => {
+        if (String(r.id) === repoId || r.fullName === targetRepo.fullName) {
+          return { ...r, isFavorite: !r.isFavorite };
         }
-        return repo;
+        return r;
       })
     );
+
+    try {
+      const payload = {
+        repositoryId: repoId,
+        name: repoName,
+        fullName: targetRepo.fullName || `${targetRepo.owner?.login || 'owner'}/${repoName}`,
+        owner: targetRepo.owner?.login || targetRepo.owner || 'owner',
+        githubUrl: targetRepo.url || targetRepo.htmlUrl || `https://github.com/${targetRepo.fullName}`,
+        language: targetRepo.language || 'TypeScript',
+        stars: targetRepo.stars || 0,
+        forks: targetRepo.forks || 0,
+        isPrivate: Boolean(targetRepo.isPrivate),
+      };
+
+      const res = await githubService.toggleFavoriteApi(payload);
+      const isFav = res?.data?.isFavorite ?? res?.isFavorite;
+      const displayName = res?.data?.repositoryName || res?.repositoryName || repoName;
+
+      toast.success(
+        isFav ? `Added ${displayName} to Favorites` : `Removed ${displayName} from Favorites`,
+        { icon: '⭐' }
+      );
+    } catch (err) {
+      console.error('Failed to update favorite status on server:', err);
+      // Revert optimistic update on failure
+      setRepositories((prev) =>
+        prev.map((r) => {
+          if (String(r.id) === repoId || r.fullName === targetRepo.fullName) {
+            return { ...r, isFavorite: !r.isFavorite };
+          }
+          return r;
+        })
+      );
+      toast.error(err.response?.data?.message || err.message || 'Failed to update favorite status');
+    }
   };
 
   const [isAnalyzingRepo, setIsAnalyzingRepo] = useState(false);
@@ -242,7 +326,9 @@ export const RepositoriesPage = () => {
             </h1>
             {!isLoading && (
               <span className="px-2.5 py-0.5 text-xs font-extrabold bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 rounded-full">
-                {totalCount}
+                {filteredRepositories.length === totalCount
+                  ? totalCount
+                  : `${filteredRepositories.length} of ${totalCount}`}
               </span>
             )}
           </div>

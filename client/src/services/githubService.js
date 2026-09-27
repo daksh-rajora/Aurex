@@ -130,6 +130,24 @@ export const githubService = {
     const response = await axiosInstance.post('/github/connect', githubData);
     return response.data;
   },
+
+  /**
+   * Toggle repository favorite status in MongoDB
+   * @param {Object} payload - { repositoryId, name, fullName, owner, githubUrl, language, stars, forks, isPrivate }
+   */
+  toggleFavoriteApi: async (payload) => {
+    const response = await axiosInstance.post('/github/favorites/toggle', payload);
+    return response.data;
+  },
+
+  /**
+   * Fetch user's saved favorites from MongoDB
+   */
+  getFavoritesApi: async () => {
+    const response = await axiosInstance.get('/github/favorites');
+    const data = response.data?.data || response.data;
+    return Array.isArray(data) ? data : [];
+  },
 };
 
 export default githubService;

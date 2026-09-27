@@ -114,7 +114,7 @@ export const RepoCard = ({
 
             {/* Favorite Star Toggle */}
             <button
-              onClick={() => onToggleFavorite(repo.id)}
+              onClick={() => onToggleFavorite(repo)}
               className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
                 repo.isFavorite
                   ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 hover:bg-amber-500/25'

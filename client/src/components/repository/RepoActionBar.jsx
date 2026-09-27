@@ -19,7 +19,49 @@ export const RepoActionBar = ({
   isRefreshing,
   onConnectGithub,
 }) => {
-  const languageOptions = ['All', 'TypeScript', 'JavaScript', 'Python', 'Go', 'Rust', 'C++', 'Java', 'HTML/CSS'];
+  const languageOptions = [
+    'All',
+    'JavaScript',
+    'TypeScript',
+    'Python',
+    'Java',
+    'C',
+    'C++',
+    'C#',
+    'Go',
+    'Rust',
+    'PHP',
+    'Ruby',
+    'Swift',
+    'Kotlin',
+    'Dart',
+    'R',
+    'Scala',
+    'Objective-C',
+    'Shell',
+    'PowerShell',
+    'HTML',
+    'CSS',
+    'SCSS',
+    'Vue',
+    'Svelte',
+    'Lua',
+    'Perl',
+    'Haskell',
+    'Elixir',
+    'Erlang',
+    'Groovy',
+    'MATLAB',
+    'SQL',
+    'Solidity',
+    'Assembly',
+    'Zig',
+    'Clojure',
+    'F#',
+    'Julia',
+    'Makefile',
+    'Dockerfile',
+  ];
   const visibilityOptions = [
     { value: 'All', label: 'All Visibility' },
     { value: 'Public', label: 'Public' },
@@ -30,6 +72,8 @@ export const RepoActionBar = ({
     { value: 'Stars', label: 'Stars (High to Low)' },
     { value: 'Name', label: 'Name (A to Z)' },
   ];
+
+  const isLanguageFiltered = selectedLanguage !== 'All' && selectedLanguage !== 'All Languages';
 
   return (
     <div className="bg-[#0F172A]/80 border border-[#2A3247] rounded-2xl p-4 shadow-lg backdrop-blur-xl flex flex-col xl:flex-row gap-4 justify-between items-stretch xl:items-center select-none">
@@ -60,23 +104,31 @@ export const RepoActionBar = ({
       {/* Filters & Actions Group */}
       <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
         {/* Language Filter */}
-        <div className="relative flex-1 sm:flex-initial min-w-[130px]">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-            <Code2 className="w-3.5 h-3.5 text-indigo-400" />
+        <div className="relative flex-1 sm:flex-initial min-w-[145px]">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+            <Code2 className={`w-3.5 h-3.5 ${isLanguageFiltered ? 'text-indigo-400 font-bold' : 'text-slate-400'}`} />
           </div>
           <select
             value={selectedLanguage}
             onChange={(e) => setSelectedLanguage(e.target.value)}
-            className="w-full appearance-none bg-[#141B2D] border border-[#2A3247] text-slate-200 text-xs font-medium rounded-xl pl-9 pr-8 py-2.5 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-colors"
+            className={`w-full appearance-none border text-xs font-medium rounded-xl pl-9 pr-8 py-2.5 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-all duration-200 ${
+              isLanguageFiltered
+                ? 'bg-indigo-500/15 border-indigo-500/60 text-indigo-300 font-bold shadow-md shadow-indigo-500/10'
+                : 'bg-[#141B2D] border-[#2A3247] text-slate-200'
+            }`}
           >
-            {languageOptions.map((lang) => (
-              <option key={lang} value={lang} className="bg-[#141B2D] text-slate-200">
-                {lang === 'All' ? 'All Languages' : lang}
-              </option>
-            ))}
+            {languageOptions.map((lang) => {
+              const isSelected = lang === selectedLanguage;
+              const label = lang === 'All' ? 'All Languages' : lang;
+              return (
+                <option key={lang} value={lang} className="bg-[#141B2D] text-slate-200">
+                  {isSelected ? `✓ ${label}` : label}
+                </option>
+              );
+            })}
           </select>
           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-            <Filter className="w-3 h-3" />
+            <Filter className={`w-3 h-3 ${isLanguageFiltered ? 'text-indigo-400' : 'text-slate-400'}`} />
           </div>
         </div>
 

@@ -6,9 +6,24 @@ import { githubConnect } from '../controllers/github/githubConnect.controller.js
 import { getGithubRepositories } from '../controllers/github/githubRepositories.controller.js';
 import { getRepositoryDetails } from '../controllers/github/repositoryDetails.controller.js';
 import { analyzeRepository } from '../controllers/github/repositoryAnalysis.controller.js';
+import { toggleFavorite, getUserFavorites } from '../controllers/github/favorite.controller.js';
 import { authenticateUser } from '../middlewares/auth.middleware.js';
 
 const router = Router();
+
+/**
+ * @route   GET /favorites
+ * @desc    Fetch authenticated user's favorited repositories from MongoDB
+ * @access  Private (JWT Required)
+ */
+router.get('/favorites', authenticateUser, getUserFavorites);
+
+/**
+ * @route   POST /favorites/toggle
+ * @desc    Toggle (add/remove) repository favorite in MongoDB
+ * @access  Private (JWT Required)
+ */
+router.post('/favorites/toggle', authenticateUser, toggleFavorite);
 
 /**
  * @route   GET /login
