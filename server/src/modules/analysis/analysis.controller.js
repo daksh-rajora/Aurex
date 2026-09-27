@@ -24,27 +24,34 @@ export const startAnalysis = asyncHandler(async (req, res) => {
   const { owner: paramOwner, repo: paramRepo } = req.params;
   const { repositoryId, repositoryName, owner: bodyOwner, githubUrl, language } = req.body || {};
 
-  let analysisReport;
+  const targetOwner = bodyOwner || paramOwner;
+  const targetRepo = repositoryName || paramRepo;
+
+  let result;
   if (paramOwner && paramRepo) {
-    analysisReport = await startAnalysisService({
+    result = await startAnalysisService({
       userId,
       owner: paramOwner,
       repo: paramRepo,
     });
   } else {
-    analysisReport = await createStartAnalysisService({
+    result = await createStartAnalysisService({
       userId,
       repositoryId,
-      repositoryName: repositoryName || paramRepo,
-      owner: bodyOwner || paramOwner,
+      repositoryName: targetRepo,
+      owner: targetOwner,
       githubUrl,
       language,
     });
   }
 
+  const analysisId = String(result.analysisId || result._id);
+
+  console.log(`[Pipeline] Analysis job created: ${analysisId}`);
+
   return res
-    .status(201)
-    .json(new ApiResponse(201, analysisReport, 'Repository analysis initiated successfully'));
+    .status(202)
+    .json(new ApiResponse(202, { analysisId }, 'Repository analysis initiated successfully'));
 });
 
 /**

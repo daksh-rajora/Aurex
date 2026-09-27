@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import analysisService from '../../services/analysisService.js';
 import {
   Sparkles,
   FolderGit2,
@@ -18,6 +20,7 @@ import {
 import toast from 'react-hot-toast';
 
 export const HeroWelcomeCard = () => {
+  const navigate = useNavigate();
   const [repoUrl, setRepoUrl] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
@@ -50,7 +53,7 @@ export const HeroWelcomeCard = () => {
     setError('');
   };
 
-  const handleAnalyze = (e) => {
+  const handleAnalyze = async (e) => {
     e.preventDefault();
     setError('');
 
@@ -64,11 +67,23 @@ export const HeroWelcomeCard = () => {
 
     setAnalyzing(true);
 
-    // Simulate AI repository scan initialization
-    setTimeout(() => {
+    try {
+      const res = await analysisService.startPublicAnalysis(repoUrl.trim());
+      const doc = res.data || res;
+      const createdAnalysisId = doc._id || doc.analysisId || doc.id;
+
+      if (createdAnalysisId) {
+        toast.success(`Repository analysis started!`);
+        navigate(`/dashboard/analysis/${createdAnalysisId}/progress`);
+      } else {
+        toast.error('Failed to obtain analysis ID from server');
+      }
+    } catch (err) {
+      console.error('Public analysis error:', err);
+      toast.error(err.response?.data?.message || err.message || 'Failed to start analysis');
+    } finally {
       setAnalyzing(false);
-      toast.success(`Repository analysis started for ${repoUrl.trim()}!`);
-    }, 1500);
+    }
   };
 
   return (

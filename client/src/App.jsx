@@ -44,6 +44,8 @@ function App() {
         <Route path="/auth/reset-password" element={<ResetPassword />} />
         <Route path="/auth/github/callback" element={<GithubCallback />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/dashboard/analysis/:analysisId/progress" element={<Dashboard />} />
+        <Route path="/dashboard/analysis/:analysisId" element={<Dashboard />} />
         <Route path="/dashboard/*" element={<Dashboard />} />
         <Route path="/repositories" element={<Navigate to="/dashboard/repositories" replace />} />
         <Route path="/analysis/:analysisId/progress" element={<Dashboard />} />

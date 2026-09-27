@@ -138,11 +138,17 @@ export const RepositoriesPage = () => {
     );
   };
 
+  const [isAnalyzingRepo, setIsAnalyzingRepo] = useState(false);
+
   // STEP 2 & 3: Initiate analysis call to backend & navigate immediately to real-time progress page
   const handleConfirmAnalysis = async (targetRepo) => {
-    if (!targetRepo) return;
+    if (!targetRepo || isAnalyzingRepo) return;
 
+    setIsAnalyzingRepo(true);
     setAnalyzeModalRepo(null);
+
+    console.log('[Analysis] Analyze clicked');
+    console.log('[Analysis] Creating analysis...');
 
     try {
       const payload = {
@@ -161,6 +167,8 @@ export const RepositoriesPage = () => {
         response?._id;
 
       if (createdAnalysisId) {
+        console.log(`[Analysis] Analysis created: ${createdAnalysisId}`);
+        console.log('[Analysis] Navigating to progress page');
         navigate(`/dashboard/analysis/${createdAnalysisId}/progress`);
       } else {
         toast.error('Failed to obtain analysis ID from server');
@@ -168,6 +176,8 @@ export const RepositoriesPage = () => {
     } catch (err) {
       console.error('Backend startAnalysis error:', err);
       toast.error(err.response?.data?.message || err.message || 'Failed to start analysis');
+    } finally {
+      setIsAnalyzingRepo(false);
     }
   };
 

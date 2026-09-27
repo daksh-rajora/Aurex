@@ -48,16 +48,19 @@ export const runAIAnalysisService = async ({ userId, analysisId }) => {
     };
 
     // Emit Stage 60%
-    emitAnalysisProgress({ analysisId, percentage: 60, stage: 'Running AI analysis' });
+    emitAnalysisProgress({ analysisId, percentage: 60, stage: 'Running AI Analysis' });
+    console.log('[Pipeline] Progress: 60');
 
     // Call OpenRouter AI service with strict type sanitization
     const aiResult = await generateRepositoryAnalysis(repoPayload);
 
     // Emit Stage 75%
-    emitAnalysisProgress({ analysisId, percentage: 75, stage: 'Generating code quality report' });
+    emitAnalysisProgress({ analysisId, percentage: 75, stage: 'Generating Security Analysis' });
+    console.log('[Pipeline] Progress: 75');
 
-    // Emit Stage 85%
-    emitAnalysisProgress({ analysisId, percentage: 85, stage: 'Generating security review' });
+    // Emit Stage 90%
+    emitAnalysisProgress({ analysisId, percentage: 90, stage: 'Generating Recommendations' });
+    console.log('[Pipeline] Progress: 90');
 
     analysisDoc.analysis = {
       // Numbers
@@ -88,10 +91,9 @@ export const runAIAnalysisService = async ({ userId, analysisId }) => {
       suggestions: aiResult.suggestions || aiResult.recommendations,
     };
 
-    // Emit Stage 92%
-    emitAnalysisProgress({ analysisId, percentage: 92, stage: 'Saving report' });
-
-    console.log(`[Pipeline] Saving MongoDB Analysis document (${analysisId})...`);
+    // Emit Stage 95%
+    emitAnalysisProgress({ analysisId, percentage: 95, stage: 'Saving Analysis' });
+    console.log('[Pipeline] Progress: 95');
 
     analysisDoc.status = 'Completed';
     analysisDoc.completedAt = new Date();
@@ -99,17 +101,17 @@ export const runAIAnalysisService = async ({ userId, analysisId }) => {
     analysisDoc.errorMessage = '';
 
     await analysisDoc.save();
-    console.log('[AI] Analysis saved successfully');
 
     // Emit Stage 100%
     emitAnalysisProgress({
       analysisId,
       percentage: 100,
-      stage: 'Analysis completed',
+      stage: 'Analysis Completed',
       status: 'Completed',
     });
 
-    console.log(`[Pipeline] Analysis completed successfully for ID: ${analysisId}`);
+    console.log('[Pipeline] Progress: 100');
+    console.log(`[Pipeline] Analysis completed: ${analysisId}`);
     return analysisDoc;
   } catch (error) {
     console.error(`[Pipeline Error] Analysis execution failed for ID ${analysisId}:`, error);

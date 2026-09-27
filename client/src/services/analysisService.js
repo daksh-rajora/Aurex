@@ -2,6 +2,15 @@ import axiosInstance from '../utils/axios.js';
 
 export const analysisService = {
   /**
+   * Initiate public analysis for any GitHub repository URL or owner/repo string
+   * @param {string} repositoryOrUrl
+   */
+  startPublicAnalysis: async (repositoryOrUrl) => {
+    const response = await axiosInstance.post('/public-analysis', { repository: repositoryOrUrl });
+    return response.data;
+  },
+
+  /**
    * Initiate analysis for a repository with payload body
    * @param {Object} payload - { repositoryId, repositoryName, owner, githubUrl, language }
    */

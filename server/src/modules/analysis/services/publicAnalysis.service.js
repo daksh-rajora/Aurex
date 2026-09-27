@@ -4,6 +4,7 @@ import ApiError from '../../../utils/ApiError.js';
 import githubConfig from '../../../config/github.config.js';
 import { parseGithubRepoInput } from '../../../utils/githubUrlParser.js';
 import { executeAIAnalysis } from '../providers/aiProvider.factory.js';
+import { emitAnalysisProgress } from '../../../socket.js';
 
 /**
  * Generates structured prompt for repository AI evaluation.
@@ -233,53 +234,94 @@ export const publicAnalysisService = async ({ repository, url, userId, provider 
       summary: 'Public repository data collected successfully. Executing AI Analysis...',
     },
     status: 'Processing',
+    aiProvider: 'OpenRouter',
   });
 
-  // 5. Execute AI analysis using existing provider factory & prompt builder
-  try {
-    const prompt = buildRepositoryPrompt(analysisDoc);
-    const selectedProvider = provider || process.env.AI_PROVIDER || 'openrouter';
-    const aiResponse = await executeAIAnalysis(prompt, selectedProvider);
+  const analysisId = String(analysisDoc._id);
 
-    const overallScore = typeof aiResponse.overallScore === 'number'
-      ? Math.min(100, Math.max(0, aiResponse.overallScore))
-      : 0;
+  // Execute pipeline asynchronously to allow Socket.IO room join before stages emit
+  const runPipelineAsync = async () => {
+    try {
+      emitAnalysisProgress({ analysisId, percentage: 10, stage: 'Connecting to GitHub' });
+      await new Promise((r) => setTimeout(r, 200));
 
-    analysisDoc.analysis = {
-      overallScore,
-      codeQuality: aiResponse.codeQuality?.score || 0,
-      documentation: aiResponse.documentation?.score || 0,
-      architecture: aiResponse.architecture?.score || 0,
-      maintainability: aiResponse.maintainability?.score || 0,
-      security: aiResponse.security?.score || 0,
-      performance: aiResponse.performance?.score || 0,
-      bestPractices: aiResponse.bestPractices?.score || 0,
-      techStack: Array.isArray(aiResponse.techStack) ? aiResponse.techStack : [],
-      architectureReview: aiResponse.architecture?.review || '',
-      codeQualityReview: aiResponse.codeQuality?.review || '',
-      documentationReview: aiResponse.documentation?.review || '',
-      securityReview: aiResponse.security?.review || '',
-      performanceReview: aiResponse.performance?.review || '',
-      maintainabilityReview: aiResponse.maintainability?.review || '',
-      bestPracticesReview: aiResponse.bestPractices?.review || '',
-      strengths: Array.isArray(aiResponse.strengths) ? aiResponse.strengths : [],
-      weaknesses: Array.isArray(aiResponse.weaknesses) ? aiResponse.weaknesses : [],
-      suggestions: Array.isArray(aiResponse.suggestions) ? aiResponse.suggestions : [],
-      summary: aiResponse.summary || 'Public repository AI analysis completed successfully.',
-    };
+      emitAnalysisProgress({ analysisId, percentage: 20, stage: 'Fetching repository metadata' });
+      await new Promise((r) => setTimeout(r, 200));
 
-    analysisDoc.status = 'Completed';
-    analysisDoc.aiProvider = selectedProvider;
+      emitAnalysisProgress({ analysisId, percentage: 30, stage: 'Reading repository structure' });
+      await new Promise((r) => setTimeout(r, 200));
 
-    await analysisDoc.save();
-    return analysisDoc;
-  } catch (error) {
-    analysisDoc.status = 'Failed';
-    await analysisDoc.save();
+      emitAnalysisProgress({ analysisId, percentage: 45, stage: 'Detecting languages' });
+      await new Promise((r) => setTimeout(r, 200));
 
-    if (error instanceof ApiError) throw error;
-    throw new ApiError(500, `Public repository AI analysis failed: ${error.message}`);
-  }
+      emitAnalysisProgress({ analysisId, percentage: 60, stage: 'Running AI analysis' });
+
+      const prompt = buildRepositoryPrompt(analysisDoc);
+      const selectedProvider = provider || process.env.AI_PROVIDER || 'openrouter';
+      const aiResponse = await executeAIAnalysis(prompt, selectedProvider);
+
+      emitAnalysisProgress({ analysisId, percentage: 75, stage: 'Generating security review' });
+      await new Promise((r) => setTimeout(r, 200));
+
+      emitAnalysisProgress({ analysisId, percentage: 90, stage: 'Generating recommendations' });
+      await new Promise((r) => setTimeout(r, 200));
+
+      const overallScore = typeof aiResponse.overallScore === 'number'
+        ? Math.min(100, Math.max(0, aiResponse.overallScore))
+        : 0;
+
+      analysisDoc.analysis = {
+        overallScore,
+        codeQuality: aiResponse.codeQuality?.score || aiResponse.codeQuality || 0,
+        documentation: aiResponse.documentation?.score || aiResponse.documentation || 0,
+        architecture: aiResponse.architecture?.score || aiResponse.architecture || 0,
+        maintainability: aiResponse.maintainability?.score || aiResponse.maintainability || 0,
+        security: aiResponse.security?.score || aiResponse.security || 0,
+        performance: aiResponse.performance?.score || aiResponse.performance || 0,
+        bestPractices: aiResponse.bestPractices?.score || aiResponse.bestPractices || 0,
+        techStack: Array.isArray(aiResponse.techStack) ? aiResponse.techStack : Array.isArray(aiResponse.technologyStack) ? aiResponse.technologyStack : [],
+        architectureReview: aiResponse.architectureReview || aiResponse.architecture?.review || '',
+        codeQualityReview: aiResponse.codeQualityReview || aiResponse.codeQuality?.review || '',
+        documentationReview: aiResponse.documentationReview || aiResponse.documentation?.review || '',
+        securityReview: aiResponse.securityReview || aiResponse.security?.review || '',
+        performanceReview: aiResponse.performanceReview || aiResponse.performance?.review || '',
+        maintainabilityReview: aiResponse.maintainabilityReview || aiResponse.maintainability?.review || '',
+        bestPracticesReview: aiResponse.bestPracticesReview || aiResponse.bestPractices?.review || '',
+        strengths: Array.isArray(aiResponse.strengths) ? aiResponse.strengths : [],
+        weaknesses: Array.isArray(aiResponse.weaknesses) ? aiResponse.weaknesses : [],
+        suggestions: Array.isArray(aiResponse.suggestions) ? aiResponse.suggestions : Array.isArray(aiResponse.recommendations) ? aiResponse.recommendations : [],
+        recommendations: Array.isArray(aiResponse.recommendations) ? aiResponse.recommendations : [],
+        summary: aiResponse.summary || 'Public repository AI analysis completed successfully.',
+      };
+
+      emitAnalysisProgress({ analysisId, percentage: 95, stage: 'Saving report' });
+
+      analysisDoc.status = 'Completed';
+      analysisDoc.aiProvider = selectedProvider;
+      analysisDoc.completedAt = new Date();
+
+      await analysisDoc.save();
+
+      emitAnalysisProgress({ analysisId, percentage: 100, stage: 'Analysis completed', status: 'Completed' });
+    } catch (error) {
+      console.error(`[Public Pipeline Error] ${error.message}`);
+      analysisDoc.status = 'Failed';
+      analysisDoc.errorMessage = error.message;
+      await analysisDoc.save();
+
+      emitAnalysisProgress({
+        analysisId,
+        percentage: 0,
+        stage: 'Analysis failed',
+        status: 'Failed',
+        error: error.message,
+      });
+    }
+  };
+
+  runPipelineAsync();
+
+  return analysisDoc;
 };
 
 export default publicAnalysisService;

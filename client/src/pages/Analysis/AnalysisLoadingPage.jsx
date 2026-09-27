@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Sparkles,
@@ -14,42 +14,89 @@ import analysisService from '../../services/analysisService.js';
 
 const STAGES = [
   { percent: 10, name: 'Connecting to GitHub' },
-  { percent: 20, name: 'Fetching repository metadata' },
-  { percent: 30, name: 'Reading repository structure' },
-  { percent: 45, name: 'Detecting languages' },
-  { percent: 60, name: 'Running AI analysis' },
-  { percent: 75, name: 'Generating code quality report' },
-  { percent: 85, name: 'Generating security review' },
-  { percent: 92, name: 'Saving report' },
-  { percent: 100, name: 'Analysis completed' },
+  { percent: 20, name: 'Fetching Repository Metadata' },
+  { percent: 30, name: 'Reading Repository Structure' },
+  { percent: 45, name: 'Detecting Languages' },
+  { percent: 60, name: 'Running AI Analysis' },
+  { percent: 75, name: 'Generating Security Analysis' },
+  { percent: 90, name: 'Generating Recommendations' },
+  { percent: 95, name: 'Saving Analysis' },
+  { percent: 100, name: 'Analysis Completed' },
 ];
 
-export const AnalysisLoadingPage = ({ repoName: propRepoName, owner: propOwner, analysisId: propAnalysisId, onComplete }) => {
+/**
+ * Extracts analysisId reliably from props, params, or URL path
+ */
+const extractAnalysisId = (propId, paramId, pathname) => {
+  if (propId) return propId;
+  if (paramId) return paramId;
+  if (!pathname) return null;
+
+  const parts = pathname.split('/').filter(Boolean);
+  const progressIdx = parts.indexOf('progress');
+  if (progressIdx > 0) {
+    return parts[progressIdx - 1];
+  }
+  const analysisIdx = parts.indexOf('analysis');
+  if (analysisIdx >= 0 && parts[analysisIdx + 1] && parts[analysisIdx + 1] !== 'progress') {
+    return parts[analysisIdx + 1];
+  }
+  return null;
+};
+
+export const AnalysisLoadingPage = ({
+  repoName: propRepoName,
+  owner: propOwner,
+  analysisId: propAnalysisId,
+  onComplete,
+}) => {
   const { analysisId: paramAnalysisId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
 
-  const targetAnalysisId = propAnalysisId || paramAnalysisId;
+  const targetAnalysisId = extractAnalysisId(propAnalysisId, paramAnalysisId, location.pathname);
 
   const [progress, setProgress] = useState(10);
   const [currentStage, setCurrentStage] = useState('Connecting to GitHub');
   const [errorMessage, setErrorMessage] = useState(null);
-  const [repoDetails, setRepoDetails] = useState({ name: propRepoName || 'Repository', owner: propOwner || '' });
+  const [repoDetails, setRepoDetails] = useState({
+    name: propRepoName || 'Repository',
+    owner: propOwner || '',
+  });
 
   useEffect(() => {
     if (!targetAnalysisId) return;
 
-    // Join Socket.IO room for targetAnalysisId
+    // Log socket connection status
+    if (socket.connected) {
+      console.log('[Analysis Progress] Socket connected');
+    } else {
+      socket.connect();
+      console.log('[Analysis Progress] Socket connected');
+    }
+
+    // Join room for targetAnalysisId
+    console.log(`[Analysis Progress] Joined room: ${targetAnalysisId}`);
     socket.emit('join_analysis', targetAnalysisId);
 
     // Handler for real-time progress events
     const handleProgress = (data) => {
-      console.log('[Socket.IO Realtime Progress Received]:', data);
+      if (!data) return;
 
+      if (typeof data.percentage === 'number') {
+        console.log(`[Analysis Progress] Progress: ${data.percentage}`);
+      }
+      if (data.stage) {
+        console.log(`[Analysis Progress] Stage: ${data.stage}`);
+      }
+
+      // 1. Handle Failed Analysis Event
       if (data.status === 'Failed' || data.error) {
         setErrorMessage(data.error || 'Analysis execution failed');
         return;
       }
 
+      // 2. Handle Progress & Stage Update
       if (typeof data.percentage === 'number') {
         setProgress(data.percentage);
       }
@@ -57,8 +104,18 @@ export const AnalysisLoadingPage = ({ repoName: propRepoName, owner: propOwner, 
         setCurrentStage(data.stage);
       }
 
-      // Automatically redirect when progress reaches 100% or status Completed
-      if (data.percentage >= 100 || data.status === 'Completed') {
+      // 3. Handle Completed Analysis Event
+      if (data.status === 'Completed' || (typeof data.percentage === 'number' && data.percentage >= 100)) {
+        console.log('[Analysis Progress] Completed');
+        setProgress(100);
+        setCurrentStage('Analysis Completed');
+
+        // Clean up socket room and event listeners
+        socket.emit('leave_analysis', targetAnalysisId);
+        socket.off('analysis_progress', handleProgress);
+        socket.off(`analysis:${targetAnalysisId}:progress`, handleProgress);
+
+        console.log('[Analysis Progress] Navigating to report');
         setTimeout(() => {
           if (onComplete) {
             onComplete();
@@ -69,35 +126,48 @@ export const AnalysisLoadingPage = ({ repoName: propRepoName, owner: propOwner, 
       }
     };
 
-    // Listen on socket room event & broadcast fallback
+    // Listen on standard event names
     socket.on('analysis_progress', handleProgress);
     socket.on(`analysis:${targetAnalysisId}:progress`, handleProgress);
 
-    // Initial check from REST API in case of page refresh
-    analysisService.getSingleAnalysis(targetAnalysisId).then((res) => {
-      const doc = res.data?.data || res.data || res;
-      if (doc) {
-        if (doc.repository?.name) {
-          setRepoDetails({
-            name: doc.repository.name,
-            owner: doc.repository.owner?.login || doc.repository.owner || '',
-          });
+    // Initial check via REST API (Handles refresh page scenario)
+    analysisService
+      .getSingleAnalysis(targetAnalysisId)
+      .then((res) => {
+        const doc = res.data?.data || res.data || res;
+        if (doc) {
+          if (doc.repository?.name) {
+            setRepoDetails({
+              name: doc.repository.name,
+              owner: doc.repository.owner?.login || doc.repository.owner || '',
+            });
+          }
+
+          if (doc.status === 'Completed') {
+            console.log('[Analysis Progress] Completed');
+            setProgress(100);
+            setCurrentStage('Analysis Completed');
+
+            socket.emit('leave_analysis', targetAnalysisId);
+
+            console.log('[Analysis Progress] Navigating to report');
+            setTimeout(() => {
+              if (onComplete) onComplete();
+              else navigate(`/dashboard/analysis/${targetAnalysisId}`);
+            }, 300);
+          } else if (doc.status === 'Failed') {
+            setErrorMessage(doc.errorMessage || 'Analysis execution failed');
+          }
         }
-        if (doc.status === 'Completed') {
-          setProgress(100);
-          setCurrentStage('Analysis completed');
-          setTimeout(() => {
-            if (onComplete) onComplete();
-            else navigate(`/dashboard/analysis/${targetAnalysisId}`);
-          }, 300);
-        } else if (doc.status === 'Failed') {
-          setErrorMessage(doc.errorMessage || 'Analysis execution failed');
-        }
-      }
-    }).catch(() => {});
+      })
+      .catch((err) => {
+        console.warn('[Analysis Progress] REST fetch warning:', err.message);
+      });
 
     return () => {
-      socket.emit('leave_analysis', targetAnalysisId);
+      if (targetAnalysisId) {
+        socket.emit('leave_analysis', targetAnalysisId);
+      }
       socket.off('analysis_progress', handleProgress);
       socket.off(`analysis:${targetAnalysisId}:progress`, handleProgress);
     };
@@ -151,7 +221,9 @@ export const AnalysisLoadingPage = ({ repoName: propRepoName, owner: propOwner, 
           </h2>
           <div className="flex items-center justify-center gap-2 text-xs text-slate-400 font-medium">
             <FolderGit2 className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="text-white font-bold">{repoDetails.owner ? `${repoDetails.owner}/${repoDetails.name}` : repoDetails.name}</span>
+            <span className="text-white font-bold">
+              {repoDetails.owner ? `${repoDetails.owner}/${repoDetails.name}` : repoDetails.name}
+            </span>
           </div>
         </div>
 
@@ -184,7 +256,10 @@ export const AnalysisLoadingPage = ({ repoName: propRepoName, owner: propOwner, 
           <div className="space-y-2 text-xs">
             {STAGES.map((stg) => {
               const isCompleted = progress >= stg.percent;
-              const isCurrent = currentStage === stg.name || (progress >= stg.percent && progress < (STAGES.find(s => s.percent > stg.percent)?.percent || 101));
+              const isCurrent =
+                currentStage.toLowerCase() === stg.name.toLowerCase() ||
+                (progress >= stg.percent &&
+                  progress < (STAGES.find((s) => s.percent > stg.percent)?.percent || 101));
 
               return (
                 <div
