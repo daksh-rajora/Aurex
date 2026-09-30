@@ -9,6 +9,7 @@ import RepoPagination from '../../components/repository/RepoPagination.jsx';
 import RepoEmptyState from '../../components/repository/RepoEmptyState.jsx';
 import RepoSkeleton from '../../components/repository/RepoSkeleton.jsx';
 import AnalyzeModal from '../../components/repository/AnalyzeModal.jsx';
+import PublicRepoModal from '../../components/repository/PublicRepoModal.jsx';
 import RepoDrawer from '../../components/repository/RepoDrawer.jsx';
 import ConnectGithubModal from '../../components/repository/ConnectGithubModal.jsx';
 import AnalysisLoadingPage from '../Analysis/AnalysisLoadingPage.jsx';
@@ -35,8 +36,10 @@ export const RepositoriesPage = () => {
   // Active Modals, Drawer & Fullscreen Loading State
   const [selectedDrawerRepo, setSelectedDrawerRepo] = useState(null);
   const [analyzeModalRepo, setAnalyzeModalRepo] = useState(null);
+  const [isPublicModalOpen, setIsPublicModalOpen] = useState(false);
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [activeAnalysisLoading, setActiveAnalysisLoading] = useState(null); // { repo, analysisId }
+
 
   // Fetch real repositories from backend and sync favorite status from MongoDB
   const fetchRepositories = useCallback(async (showSkeleton = true) => {
@@ -422,6 +425,7 @@ export const RepositoriesPage = () => {
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing}
         onConnectGithub={handleInitiateGithubConnect}
+        onOpenPublicModal={() => setIsPublicModalOpen(true)}
       />
 
       {/* Loading Skeletons vs Real Repository Cards Grid */}
@@ -462,6 +466,11 @@ export const RepositoriesPage = () => {
         onConfirmAnalysis={handleConfirmAnalysis}
       />
 
+      <PublicRepoModal
+        isOpen={isPublicModalOpen}
+        onClose={() => setIsPublicModalOpen(false)}
+      />
+
       <RepoDrawer
         isOpen={Boolean(selectedDrawerRepo)}
         onClose={() => setSelectedDrawerRepo(null)}
@@ -479,3 +488,4 @@ export const RepositoriesPage = () => {
 };
 
 export default RepositoriesPage;
+

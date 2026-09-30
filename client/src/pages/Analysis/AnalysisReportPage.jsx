@@ -192,8 +192,65 @@ export const AnalysisReportPage = () => {
 
   const rootContentsList = Array.isArray(metadata.rootContents) ? metadata.rootContents : [];
 
-  const handleExportPDF = () => {
-    toast.success('Generating PDF Report... Download will start shortly!');
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
+
+  const handleExportPDF = async () => {
+    if (!analysisId || isExportingPDF) return;
+
+    setIsExportingPDF(true);
+    const toastId = toast.loading('Generating PDF Report...');
+
+    try {
+      const response = await analysisService.downloadAnalysisPdf(analysisId);
+
+      // Extract filename from Content-Disposition header if available
+      let filename = `aurex-analysis-${(repoName || 'report').toLowerCase().replace(/[^a-z0-9]/g, '-')}.pdf`;
+      const contentDisposition = response.headers?.['content-disposition'];
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) {
+          filename = match[1];
+        }
+      }
+
+      // Create Blob and trigger browser download
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+
+      toast.success('Analysis report exported successfully.', { id: toastId, icon: '📄' });
+    } catch (err) {
+      console.error('PDF Export Error:', err);
+
+      let errorMsg = 'Unable to generate PDF. Please try again.';
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const parsed = JSON.parse(text);
+          errorMsg = parsed.message || errorMsg;
+        } catch {}
+      } else if (err.response?.data?.message) {
+        errorMsg = err.response.data.message;
+      }
+
+      if (err.response?.status === 404) {
+        errorMsg = 'Analysis not found.';
+      } else if (err.response?.status === 403) {
+        errorMsg = 'You are not authorized to export this report.';
+      } else if (err.response?.status === 400 && errorMsg.includes('Completed')) {
+        errorMsg = 'Analysis is still processing.';
+      }
+
+      toast.error(errorMsg, { id: toastId });
+    } finally {
+      setIsExportingPDF(false);
+    }
   };
 
   const handleShareReport = () => {
@@ -238,10 +295,20 @@ export const AnalysisReportPage = () => {
         <div className="flex items-center gap-2.5">
           <button
             onClick={handleExportPDF}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#141B2D] border border-[#2A3247] hover:border-indigo-500/40 text-slate-200 hover:text-white text-xs font-bold transition-all cursor-pointer shadow-md"
+            disabled={isExportingPDF}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#141B2D] border border-[#2A3247] hover:border-indigo-500/40 text-slate-200 hover:text-white text-xs font-bold transition-all cursor-pointer shadow-md disabled:opacity-50"
           >
-            <FileText className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Export PDF</span>
+            {isExportingPDF ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+                <span>Generating PDF...</span>
+              </>
+            ) : (
+              <>
+                <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Export PDF</span>
+              </>
+            )}
           </button>
 
           <button

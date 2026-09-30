@@ -1,4 +1,4 @@
-import { Search, X, RotateCw, Plus, Filter, ArrowUpDown, Code2, Eye } from 'lucide-react';
+import { Search, X, RotateCw, Plus, Filter, ArrowUpDown, Code2, Eye, Globe, Sparkles } from 'lucide-react';
 
 const GithubIcon = ({ className = 'w-4 h-4' }) => (
   <svg className={`${className} fill-current`} viewBox="0 0 24 24">
@@ -18,6 +18,7 @@ export const RepoActionBar = ({
   onRefresh,
   isRefreshing,
   onConnectGithub,
+  onOpenPublicModal,
 }) => {
   const languageOptions = [
     'All',
@@ -183,6 +184,15 @@ export const RepoActionBar = ({
             <RotateCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-indigo-400' : ''}`} />
           </button>
 
+          {/* Analyze Public Repository Button */}
+          <button
+            onClick={onOpenPublicModal}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#141B2D] border border-indigo-500/40 hover:border-indigo-400 hover:bg-indigo-500/10 text-indigo-300 hover:text-white text-xs font-bold transition-all duration-200 cursor-pointer active:scale-[0.98] shadow-md shadow-indigo-500/5"
+          >
+            <Globe className="w-4 h-4 text-indigo-400" />
+            <span>Analyze Public Repo</span>
+          </button>
+
           {/* Connect GitHub Button */}
           <button
             onClick={onConnectGithub}
@@ -198,3 +208,4 @@ export const RepoActionBar = ({
 };
 
 export default RepoActionBar;
+

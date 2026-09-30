@@ -14,6 +14,7 @@ import DashboardFooter from '../components/dashboard/DashboardFooter.jsx';
 import RepositoriesPage from './Repositories/RepositoriesPage.jsx';
 import AnalysisReportPage from './Analysis/AnalysisReportPage.jsx';
 import AnalysisLoadingPage from './Analysis/AnalysisLoadingPage.jsx';
+import HistoryPage from './History/HistoryPage.jsx';
 
 export const Dashboard = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -21,7 +22,8 @@ export const Dashboard = () => {
 
   const isRepositoriesRoute = location.pathname.includes('/repositories');
   const isProgressRoute = location.pathname.includes('/progress');
-  const isAnalysisRoute = location.pathname.includes('/analysis') && !isProgressRoute;
+  const isHistoryRoute = location.pathname.includes('/history');
+  const isAnalysisRoute = location.pathname.includes('/analysis') && !isProgressRoute && !isHistoryRoute;
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#0B1020] text-slate-100 flex font-sans select-none">
@@ -47,13 +49,16 @@ export const Dashboard = () => {
         {/* 3. Scrollable Main Content Area */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-8 space-y-6">
           <div className="max-w-7xl w-full mx-auto space-y-6">
-            {isRepositoriesRoute ? (
+            {isHistoryRoute ? (
+              <HistoryPage />
+            ) : isRepositoriesRoute ? (
               <RepositoriesPage />
             ) : isProgressRoute ? (
               <AnalysisLoadingPage />
             ) : isAnalysisRoute ? (
               <AnalysisReportPage />
             ) : (
+
               <>
                 {/* Repository Analyzer Hero Card */}
                 <HeroWelcomeCard />

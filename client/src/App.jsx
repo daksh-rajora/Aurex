@@ -48,6 +48,7 @@ function App() {
         <Route path="/dashboard/analysis/:analysisId" element={<Dashboard />} />
         <Route path="/dashboard/*" element={<Dashboard />} />
         <Route path="/repositories" element={<Navigate to="/dashboard/repositories" replace />} />
+        <Route path="/history" element={<Navigate to="/dashboard/history" replace />} />
         <Route path="/analysis/:analysisId/progress" element={<Dashboard />} />
         <Route path="/analysis/:analysisId" element={<Dashboard />} />
         <Route path="/analysis" element={<Dashboard />} />
