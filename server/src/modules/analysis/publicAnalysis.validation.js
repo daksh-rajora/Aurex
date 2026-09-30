@@ -3,12 +3,10 @@ import ApiError from '../../utils/ApiError.js';
 
 export const validatePublicAnalysis = [
   body().custom((value, { req }) => {
-    const repository = req.body?.repository;
-    const url = req.body?.url;
+    const rawInput = req.body?.githubUrl || req.body?.url || req.body?.repository;
 
-    if ((!repository || typeof repository !== 'string' || !repository.trim()) &&
-        (!url || typeof url !== 'string' || !url.trim())) {
-      throw new Error('Please provide either "repository" (e.g. "facebook/react") or "url" (e.g. "https://github.com/facebook/react")');
+    if (!rawInput || typeof rawInput !== 'string' || !rawInput.trim()) {
+      throw new Error('Please enter a valid public GitHub repository URL.');
     }
     return true;
   }),
@@ -22,3 +20,4 @@ export const validatePublicAnalysis = [
 ];
 
 export default validatePublicAnalysis;
+

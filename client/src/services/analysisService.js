@@ -6,8 +6,16 @@ export const analysisService = {
    * @param {string} repositoryOrUrl
    */
   startPublicAnalysis: async (repositoryOrUrl) => {
-    const response = await axiosInstance.post('/public-analysis', { repository: repositoryOrUrl });
-    return response.data;
+    try {
+      const response = await axiosInstance.post('/analysis/public', { githubUrl: repositoryOrUrl });
+      return response.data;
+    } catch (err) {
+      if (err.response?.status === 404) {
+        const fallbackRes = await axiosInstance.post('/public-analysis', { githubUrl: repositoryOrUrl, repository: repositoryOrUrl });
+        return fallbackRes.data;
+      }
+      throw err;
+    }
   },
 
   /**
@@ -40,10 +48,20 @@ export const analysisService = {
   },
 
   /**
-   * Fetch analysis history for the logged-in user
+   * Fetch analysis history for the logged-in user with search, filter & pagination params
+   * @param {Object} [params]
    */
-  getAnalysisHistory: async () => {
-    const response = await axiosInstance.get('/analysis/history');
+  getAnalysisHistory: async (params = {}) => {
+    const response = await axiosInstance.get('/analysis/history', { params });
+    return response.data;
+  },
+
+  /**
+   * Delete single analysis report document by analysisId
+   * @param {string} analysisId
+   */
+  deleteAnalysis: async (analysisId) => {
+    const response = await axiosInstance.delete(`/analysis/${analysisId}`);
     return response.data;
   },
 
@@ -64,6 +82,19 @@ export const analysisService = {
     const response = await axiosInstance.get(`/analysis/${analysisId}/report`);
     return response.data;
   },
+
+  /**
+   * Download analysis report as PDF blob
+   * @param {string} analysisId
+   */
+  downloadAnalysisPdf: async (analysisId) => {
+    const response = await axiosInstance.get(`/analysis/${analysisId}/pdf`, {
+      responseType: 'blob',
+    });
+    return response;
+  },
 };
 
 export default analysisService;
+
+

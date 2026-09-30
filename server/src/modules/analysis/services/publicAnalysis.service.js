@@ -122,14 +122,53 @@ Evaluate the project and return a STRICT JSON object matching EXACTLY the follow
  * @param {string} [params.provider] - Optional AI provider
  * @returns {Promise<Object>} Complete Analysis document report
  */
-export const publicAnalysisService = async ({ repository, url, userId, provider }) => {
-  const rawInput = repository || url;
+export const publicAnalysisService = async ({ githubUrl, repository, url, userId, provider }) => {
+  const rawInput = githubUrl || repository || url;
   if (!rawInput) {
-    throw new ApiError(400, 'Either "repository" or "url" must be provided in request body');
+    throw new ApiError(400, 'Please enter a valid public GitHub repository URL.');
   }
 
   // 1. Parse and validate GitHub URL / input
   const { owner, repo } = parseGithubRepoInput(rawInput);
+  const fullNameLower = `${owner.toLowerCase()}/${repo.toLowerCase()}`;
+
+  // 2. Duplicate Analysis Check (Requirement 13)
+  // Check if an analysis for this repository is currently Processing or was recently Completed
+  const existingProcessingDoc = await Analysis.findOne({
+    'repository.fullName': { $regex: new RegExp(`^${owner}/${repo}$`, 'i') },
+    status: 'Processing',
+    createdAt: { $gte: new Date(Date.now() - 5 * 60 * 1000) },
+  });
+
+  if (existingProcessingDoc) {
+    console.log(`[Public Pipeline] Reusing active processing job: ${existingProcessingDoc._id}`);
+    return {
+      analysisId: String(existingProcessingDoc._id),
+      repository: {
+        owner: existingProcessingDoc.repository?.owner || owner,
+        name: existingProcessingDoc.repository?.name || repo,
+        fullName: existingProcessingDoc.repository?.fullName || `${owner}/${repo}`,
+      },
+    };
+  }
+
+  const existingCompletedDoc = await Analysis.findOne({
+    'repository.fullName': { $regex: new RegExp(`^${owner}/${repo}$`, 'i') },
+    status: 'Completed',
+    createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+  }).sort({ createdAt: -1 });
+
+  if (existingCompletedDoc) {
+    console.log(`[Public Pipeline] Reusing recent completed analysis: ${existingCompletedDoc._id}`);
+    return {
+      analysisId: String(existingCompletedDoc._id),
+      repository: {
+        owner: existingCompletedDoc.repository?.owner || owner,
+        name: existingCompletedDoc.repository?.name || repo,
+        fullName: existingCompletedDoc.repository?.fullName || `${owner}/${repo}`,
+      },
+    };
+  }
 
   const headers = {
     Accept: 'application/vnd.github+json',
@@ -138,75 +177,55 @@ export const publicAnalysisService = async ({ repository, url, userId, provider 
 
   const baseUrl = `${githubConfig.apiBaseUrl}/repos/${owner}/${repo}`;
 
-  // 2. Fetch public repository metadata from GitHub API
+  // 3. Fetch public repository metadata from GitHub API to verify existence and visibility
   let repoRes;
   try {
     repoRes = await axios.get(baseUrl, { headers, timeout: 15000 });
   } catch (err) {
     if (err.response?.status === 404) {
-      throw new ApiError(404, `Repository "${owner}/${repo}" not found on GitHub`);
+      throw new ApiError(404, 'Repository not found.');
+    }
+    if (err.response?.status === 403 && err.response?.headers?.['x-ratelimit-remaining'] === '0') {
+      throw new ApiError(429, 'GitHub API rate limit reached. Please try again later.');
     }
     throw new ApiError(
       err.response?.status || 500,
-      err.response?.data?.message || `Failed to fetch public repository "${owner}/${repo}" from GitHub`
+      err.response?.data?.message || 'Unable to analyze this repository right now.'
     );
   }
 
   const repoData = repoRes.data;
 
-  // 3. Reject private repositories
+  // 4. Reject private repositories
   if (repoData.private || repoData.visibility === 'private') {
     throw new ApiError(
       400,
-      `Repository "${owner}/${repo}" is private. Public analysis is only available for public repositories.`
+      'This repository is private. Only public repositories can be analyzed.'
     );
   }
 
-  // Concurrently fetch languages, README, and root contents
-  const [languagesRes, readmeRes, contentsRes] = await Promise.all([
-    axios.get(`${baseUrl}/languages`, { headers }).catch(() => ({ data: {} })),
-    axios.get(`${baseUrl}/readme`, { headers }).catch(() => null),
-    axios.get(`${baseUrl}/contents`, { headers }).catch(() => null),
-  ]);
+  const mainLanguage = repoData.language || 'Unknown';
+  const repoOwner = repoData.owner?.login || owner;
+  const repoName = repoData.name || repo;
+  const repoFullName = repoData.full_name || `${repoOwner}/${repoName}`;
 
-  const languages = languagesRes.data || {};
-
-  let readmeData = { exists: false, content: null };
-  if (readmeRes?.data?.content) {
-    try {
-      readmeData = {
-        exists: true,
-        content: Buffer.from(readmeRes.data.content, 'base64').toString('utf-8'),
-      };
-    } catch {
-      readmeData = { exists: false, content: null };
-    }
-  }
-
-  const rootContents = Array.isArray(contentsRes?.data)
-    ? contentsRes.data.map((item) => ({
-        name: item.name,
-        type: item.type,
-        path: item.path,
-      }))
-    : [];
-
-  const mainLanguage = repoData.language || Object.keys(languages)[0] || 'Unknown';
-
-  // 4. Create Analysis record in MongoDB
+  // 5. Create Analysis record in MongoDB with status "Processing" immediately
   const analysisDoc = await Analysis.create({
     user: userId || null,
     repository: {
-      owner: repoData.owner?.login || owner,
-      name: repoData.name || repo,
-      fullName: repoData.full_name || `${owner}/${repo}`,
-      htmlUrl: repoData.html_url || `https://github.com/${owner}/${repo}`,
+      owner: repoOwner,
+      name: repoName,
+      fullName: repoFullName,
+      htmlUrl: repoData.html_url || `https://github.com/${repoFullName}`,
       defaultBranch: repoData.default_branch || 'main',
       description: repoData.description || '',
-      visibility: repoData.visibility || 'public',
+      visibility: 'public',
+      license: repoData.license?.name || 'MIT',
+      size: repoData.size ? `${Math.round(((repoData.size || 1024) / 1024) * 10) / 10} MB` : '1.0 MB',
     },
     github: {
       repoId: String(repoData.id || ''),
+      htmlUrl: repoData.html_url || `https://github.com/${repoFullName}`,
       language: mainLanguage,
       stars: repoData.stargazers_count || 0,
       forks: repoData.forks_count || 0,
@@ -215,9 +234,9 @@ export const publicAnalysisService = async ({ repository, url, userId, provider 
       topics: Array.isArray(repoData.topics) ? repoData.topics : [],
     },
     metadata: {
-      languages,
-      readme: readmeData,
-      rootContents,
+      languages: {},
+      readme: { exists: false, content: null },
+      rootContents: [],
     },
     analysis: {
       overallScore: 0,
@@ -239,32 +258,73 @@ export const publicAnalysisService = async ({ repository, url, userId, provider 
 
   const analysisId = String(analysisDoc._id);
 
-  // Execute pipeline asynchronously to allow Socket.IO room join before stages emit
+  // 6. Execute background pipeline asynchronously (non-blocking)
   const runPipelineAsync = async () => {
     try {
+      // 10% Connecting to GitHub
       emitAnalysisProgress({ analysisId, percentage: 10, stage: 'Connecting to GitHub' });
-      await new Promise((r) => setTimeout(r, 200));
+      await new Promise((r) => setTimeout(r, 150));
 
-      emitAnalysisProgress({ analysisId, percentage: 20, stage: 'Fetching repository metadata' });
-      await new Promise((r) => setTimeout(r, 200));
+      // 20% Fetching Repository Metadata
+      emitAnalysisProgress({ analysisId, percentage: 20, stage: 'Fetching Repository Metadata' });
+      const [languagesRes, readmeRes, contentsRes] = await Promise.all([
+        axios.get(`${baseUrl}/languages`, { headers }).catch(() => ({ data: {} })),
+        axios.get(`${baseUrl}/readme`, { headers }).catch(() => null),
+        axios.get(`${baseUrl}/contents`, { headers }).catch(() => null),
+      ]);
 
-      emitAnalysisProgress({ analysisId, percentage: 30, stage: 'Reading repository structure' });
-      await new Promise((r) => setTimeout(r, 200));
+      const languages = languagesRes.data || {};
+      let readmeData = { exists: false, content: null };
+      if (readmeRes?.data?.content) {
+        try {
+          readmeData = {
+            exists: true,
+            content: Buffer.from(readmeRes.data.content, 'base64').toString('utf-8'),
+          };
+        } catch {
+          readmeData = { exists: false, content: null };
+        }
+      }
 
-      emitAnalysisProgress({ analysisId, percentage: 45, stage: 'Detecting languages' });
-      await new Promise((r) => setTimeout(r, 200));
+      const rootContents = Array.isArray(contentsRes?.data)
+        ? contentsRes.data.map((item) => ({
+            name: item.name,
+            type: item.type,
+            path: item.path,
+          }))
+        : [];
 
-      emitAnalysisProgress({ analysisId, percentage: 60, stage: 'Running AI analysis' });
+      // 30% Reading Repository Structure
+      emitAnalysisProgress({ analysisId, percentage: 30, stage: 'Reading Repository Structure' });
+      await new Promise((r) => setTimeout(r, 150));
+
+      // 45% Detecting Languages
+      emitAnalysisProgress({ analysisId, percentage: 45, stage: 'Detecting Languages' });
+      analysisDoc.metadata = {
+        languages,
+        readme: readmeData,
+        rootContents,
+      };
+      if (repoData.language || Object.keys(languages)[0]) {
+        analysisDoc.github.language = repoData.language || Object.keys(languages)[0];
+      }
+      await analysisDoc.save();
+      await new Promise((r) => setTimeout(r, 150));
+
+      // 60% Running AI Analysis
+      emitAnalysisProgress({ analysisId, percentage: 60, stage: 'Running AI Analysis' });
 
       const prompt = buildRepositoryPrompt(analysisDoc);
       const selectedProvider = provider || process.env.AI_PROVIDER || 'openrouter';
       const aiResponse = await executeAIAnalysis(prompt, selectedProvider);
 
-      emitAnalysisProgress({ analysisId, percentage: 75, stage: 'Generating security review' });
-      await new Promise((r) => setTimeout(r, 200));
+      // 75% Generating Security Analysis
+      emitAnalysisProgress({ analysisId, percentage: 75, stage: 'Generating Security Analysis' });
+      await new Promise((r) => setTimeout(r, 150));
 
-      emitAnalysisProgress({ analysisId, percentage: 90, stage: 'Generating recommendations' });
-      await new Promise((r) => setTimeout(r, 200));
+      // 90% Generating Recommendations
+      emitAnalysisProgress({ analysisId, percentage: 90, stage: 'Generating Recommendations' });
+      await new Promise((r) => setTimeout(r, 150));
 
       const overallScore = typeof aiResponse.overallScore === 'number'
         ? Math.min(100, Math.max(0, aiResponse.overallScore))
@@ -294,7 +354,8 @@ export const publicAnalysisService = async ({ repository, url, userId, provider 
         summary: aiResponse.summary || 'Public repository AI analysis completed successfully.',
       };
 
-      emitAnalysisProgress({ analysisId, percentage: 95, stage: 'Saving report' });
+      // 95% Saving Analysis
+      emitAnalysisProgress({ analysisId, percentage: 95, stage: 'Saving Analysis' });
 
       analysisDoc.status = 'Completed';
       analysisDoc.aiProvider = selectedProvider;
@@ -302,7 +363,8 @@ export const publicAnalysisService = async ({ repository, url, userId, provider 
 
       await analysisDoc.save();
 
-      emitAnalysisProgress({ analysisId, percentage: 100, stage: 'Analysis completed', status: 'Completed' });
+      // 100% Analysis Completed
+      emitAnalysisProgress({ analysisId, percentage: 100, stage: 'Analysis Completed', status: 'Completed' });
     } catch (error) {
       console.error(`[Public Pipeline Error] ${error.message}`);
       analysisDoc.status = 'Failed';
@@ -321,7 +383,15 @@ export const publicAnalysisService = async ({ repository, url, userId, provider 
 
   runPipelineAsync();
 
-  return analysisDoc;
+  return {
+    analysisId,
+    repository: {
+      owner: repoOwner,
+      name: repoName,
+      fullName: repoFullName,
+    },
+  };
 };
 
 export default publicAnalysisService;
+

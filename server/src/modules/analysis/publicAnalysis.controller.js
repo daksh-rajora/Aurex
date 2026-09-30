@@ -4,13 +4,14 @@ import { publicAnalysisService } from './services/publicAnalysis.service.js';
 
 /**
  * Controller to handle Public Repository AI Analysis.
- * Can be accessed by anyone (no GitHub account connection or authentication required).
+ * Can be accessed by logged in users without connecting GitHub OAuth.
  */
 export const runPublicAnalysis = asyncHandler(async (req, res) => {
-  const { repository, url, provider } = req.body || {};
+  const { githubUrl, repository, url, provider } = req.body || {};
   const userId = req.user?._id || null;
 
-  const report = await publicAnalysisService({
+  const result = await publicAnalysisService({
+    githubUrl,
     repository,
     url,
     userId,
@@ -19,7 +20,8 @@ export const runPublicAnalysis = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, report, 'Public repository analysis completed successfully'));
+    .json(new ApiResponse(200, result, 'Public repository analysis started successfully'));
 });
 
 export default runPublicAnalysis;
+

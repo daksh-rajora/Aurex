@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import User from '../../models/User.js';
 import Analysis from '../../models/Analysis.js';
 import ApiError from '../../utils/ApiError.js';
@@ -284,27 +285,156 @@ export const createStartAnalysisService = async ({
 };
 
 /**
- * Service to fetch analysis history for the logged-in user.
+ * Service to fetch analysis history for the logged-in user with pagination, search, filtering & summary stats.
  */
-export const getAnalysisHistoryService = async (userId) => {
+export const getAnalysisHistoryService = async ({
+  userId,
+  page = 1,
+  limit = 10,
+  search = '',
+  status = 'All',
+  source = 'All',
+  dateRange = 'All Time',
+  sort = 'Newest First',
+}) => {
   if (!userId) {
     throw new ApiError(401, 'Authentication is required');
   }
 
-  const history = await Analysis.find({ user: userId })
-    .select('repository status analysis.overallScore createdAt completedAt')
-    .sort({ createdAt: -1 });
+  const query = { user: userId };
 
-  return history.map((item) => ({
-    _id: item._id,
-    repository: item.repository?.name || '',
-    owner: item.repository?.owner || '',
-    status: item.status,
-    overallScore: item.analysis?.overallScore ?? 0,
-    createdAt: item.createdAt,
-    completedAt: item.completedAt,
-  }));
+  // 1. Search filter
+  if (search && typeof search === 'string' && search.trim()) {
+    const q = search.trim();
+    const regex = new RegExp(q, 'i');
+    query.$or = [
+      { 'repository.name': regex },
+      { 'repository.owner': regex },
+      { 'repository.fullName': regex },
+    ];
+  }
+
+  // 2. Status filter
+  if (status && status !== 'All') {
+    query.status = status;
+  }
+
+  // 3. Source filter (Connected GitHub vs Public Repository)
+  if (source && source !== 'All') {
+    if (source === 'Public Repository' || source === 'public') {
+      query.$or = [
+        { 'repository.visibility': 'public' },
+        { isPublicRepo: true },
+      ];
+    } else if (source === 'Connected GitHub' || source === 'connected') {
+      query.$or = [
+        { 'repository.visibility': 'private' },
+        { isPublicRepo: false },
+      ];
+    }
+  }
+
+  // 4. Date Range filter
+  if (dateRange && dateRange !== 'All Time') {
+    const now = new Date();
+    if (dateRange === 'Today') {
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      query.createdAt = { $gte: startOfToday };
+    } else if (dateRange === 'Last 7 Days') {
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      query.createdAt = { $gte: sevenDaysAgo };
+    } else if (dateRange === 'Last 30 Days') {
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      query.createdAt = { $gte: thirtyDaysAgo };
+    }
+  }
+
+  // 5. Sorting
+  let sortOption = { createdAt: -1 };
+  if (sort === 'Oldest First') {
+    sortOption = { createdAt: 1 };
+  } else if (sort === 'Highest Score') {
+    sortOption = { 'analysis.overallScore': -1, createdAt: -1 };
+  } else if (sort === 'Lowest Score') {
+    sortOption = { 'analysis.overallScore': 1, createdAt: -1 };
+  }
+
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+  const skip = (pageNum - 1) * limitNum;
+
+  // Execute Count, Queries & Aggregation concurrently
+  const userObjectId = new mongoose.Types.ObjectId(String(userId));
+
+  const [total, analyses, userSummaryAgg] = await Promise.all([
+    Analysis.countDocuments(query),
+    Analysis.find(query)
+      .sort(sortOption)
+      .skip(skip)
+      .limit(limitNum)
+      .lean(),
+    Analysis.aggregate([
+      { $match: { user: userObjectId } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          completed: {
+            $sum: { $cond: [{ $eq: ['$status', 'Completed'] }, 1, 0] },
+          },
+          processing: {
+            $sum: { $cond: [{ $eq: ['$status', 'Processing'] }, 1, 0] },
+          },
+          failed: {
+            $sum: { $cond: [{ $eq: ['$status', 'Failed'] }, 1, 0] },
+          },
+          avgScore: {
+            $avg: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ['$status', 'Completed'] },
+                    { $gt: ['$analysis.overallScore', 0] },
+                  ],
+                },
+                '$analysis.overallScore',
+                null,
+              ],
+            },
+          },
+        },
+      },
+    ]),
+  ]);
+
+  const userStats = userSummaryAgg[0] || {
+    total: 0,
+    completed: 0,
+    processing: 0,
+    failed: 0,
+    avgScore: 0,
+  };
+
+  const totalPages = Math.ceil(total / limitNum) || 1;
+
+  return {
+    analyses,
+    pagination: {
+      page: pageNum,
+      limit: limitNum,
+      total,
+      totalPages,
+    },
+    summary: {
+      total: userStats.total || 0,
+      completed: userStats.completed || 0,
+      processing: userStats.processing || 0,
+      failed: userStats.failed || 0,
+      averageScore: Math.round(userStats.avgScore || 0),
+    },
+  };
 };
+
 
 /**
  * Service to fetch a single analysis report by analysisId.

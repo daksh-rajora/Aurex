@@ -6,7 +6,10 @@ import {
   getSingleAnalysis,
   getAnalysisReport,
   deleteAnalysis,
+  exportPdfReport,
 } from './analysis.controller.js';
+import { runPublicAnalysis } from './publicAnalysis.controller.js';
+import { validatePublicAnalysis } from './publicAnalysis.validation.js';
 import {
   validateStartAnalysis,
   validateAnalysisId,
@@ -14,6 +17,13 @@ import {
 import { authenticateUser } from '../../middlewares/auth.middleware.js';
 
 const router = Router();
+
+/**
+ * @route   POST /public
+ * @desc    Analyze any public GitHub repository (No GitHub account linking required)
+ * @access  Private (Aurex JWT Required)
+ */
+router.post('/public', authenticateUser, validatePublicAnalysis, runPublicAnalysis);
 
 /**
  * @route   GET /history
@@ -28,6 +38,7 @@ router.get('/history', authenticateUser, getAnalysisHistory);
  * @access  Private (JWT Required)
  */
 router.post('/start', authenticateUser, startAnalysis);
+
 
 /**
  * @route   POST /:owner/:repo
@@ -44,11 +55,19 @@ router.post('/:owner/:repo', authenticateUser, validateStartAnalysis, startAnaly
 router.post('/:analysisId/run', authenticateUser, validateAnalysisId, runAIAnalysis);
 
 /**
+ * @route   GET /:analysisId/pdf
+ * @desc    Export AI analysis report as PDF document
+ * @access  Private (JWT Required)
+ */
+router.get('/:analysisId/pdf', authenticateUser, validateAnalysisId, exportPdfReport);
+
+/**
  * @route   GET /:analysisId/report
  * @desc    Return detailed AI analysis report document
  * @access  Private (JWT Required)
  */
 router.get('/:analysisId/report', authenticateUser, validateAnalysisId, getAnalysisReport);
+
 
 /**
  * @route   GET /:analysisId

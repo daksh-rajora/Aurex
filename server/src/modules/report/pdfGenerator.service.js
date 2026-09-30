@@ -14,8 +14,7 @@ const getScoreColor = (score = 0) => {
  * Draw section header in PDF.
  */
 const drawSectionHeader = (doc, title) => {
-  // Add space if needed
-  if (doc.y > 680) {
+  if (doc.y > 670) {
     doc.addPage();
   } else {
     doc.moveDown(1.2);
@@ -23,14 +22,14 @@ const drawSectionHeader = (doc, title) => {
 
   const startY = doc.y;
 
-  // Header background pill line
+  // Header background bar accent
   doc
     .rect(50, startY, 4, 18)
     .fill('#4F46E5');
 
   doc
     .fillColor('#0F172A')
-    .fontSize(14)
+    .fontSize(13)
     .font('Helvetica-Bold')
     .text(title, 62, startY + 1);
 
@@ -38,15 +37,15 @@ const drawSectionHeader = (doc, title) => {
 };
 
 /**
- * Draw bullet points list.
+ * Draw bullet points list safely with multi-page handling.
  */
 const drawBulletList = (doc, items = [], bulletColor = '#4F46E5') => {
   if (!items || items.length === 0) {
     doc
       .fillColor('#64748B')
-      .fontSize(10)
+      .fontSize(9.5)
       .font('Helvetica-Oblique')
-      .text('No items specified.', 60);
+      .text('None specified.', 60);
     return;
   }
 
@@ -57,17 +56,16 @@ const drawBulletList = (doc, items = [], bulletColor = '#4F46E5') => {
 
     const startY = doc.y;
 
-    // Bullet circle
+    // Bullet icon
     doc
-      .circle(65, startY + 5, 3)
+      .circle(62, startY + 4, 2.5)
       .fill(bulletColor);
 
-    // Text
     doc
       .fillColor('#334155')
-      .fontSize(10)
+      .fontSize(9.5)
       .font('Helvetica')
-      .text(item, 76, startY, { width: 480, lineGap: 3 });
+      .text(item, 72, startY, { width: 470, lineGap: 3 });
 
     doc.moveDown(0.3);
   });
@@ -97,7 +95,10 @@ export const generateAnalysisPdf = (analysisDoc) => {
       const github = analysisDoc.github || {};
       const ai = analysisDoc.analysis || {};
 
-      const fullName = repo.fullName || `${repo.owner || 'Unknown'}/${repo.name || 'Repository'}`;
+      const repoName = repo.name || 'Repository';
+      const repoOwner = repo.owner || 'owner';
+      const fullName = repo.fullName || `${repoOwner}/${repoName}`;
+      const githubUrl = repo.htmlUrl || github.htmlUrl || `https://github.com/${fullName}`;
       const overallScore = ai.overallScore ?? 0;
       const scoreColor = getScoreColor(overallScore);
 
@@ -105,91 +106,88 @@ export const generateAnalysisPdf = (analysisDoc) => {
       // COVER PAGE
       // ==========================================
 
-      // Brand Header Bar
+      // Brand Top Banner
       doc
-        .rect(0, 0, 595.28, 140)
-        .fill('#1E293B');
+        .rect(0, 0, 595.28, 130)
+        .fill('#0F172A');
 
       doc
         .fillColor('#818CF8')
-        .fontSize(12)
+        .fontSize(16)
         .font('Helvetica-Bold')
-        .text('AUREX', 50, 40, { characterSpacing: 2 });
+        .text('AUREX AI', 50, 35, { characterSpacing: 2 });
 
       doc
         .fillColor('#94A3B8')
-        .fontSize(10)
+        .fontSize(9.5)
         .font('Helvetica')
-        .text('AI Repository Intelligence & Quality Analyzer', 110, 41);
+        .text('Developer Intelligence & Automated Code Auditing', 50, 56);
 
-      // Report Title
       doc
         .fillColor('#FFFFFF')
-        .fontSize(22)
+        .fontSize(20)
         .font('Helvetica-Bold')
-        .text('REPOSITORY ANALYSIS REPORT', 50, 75);
+        .text('REPOSITORY INTELLIGENCE REPORT', 50, 80);
 
-      // Main Content Box on Cover
-      doc.y = 160;
+      // Repository Title Section
+      doc.y = 150;
 
-      // Repository Name Banner
       doc
         .fillColor('#0F172A')
         .fontSize(18)
         .font('Helvetica-Bold')
-        .text(fullName, 50, 170);
+        .text(fullName, 50, 155);
 
       if (repo.description) {
         doc
           .fillColor('#475569')
-          .fontSize(10)
+          .fontSize(9.5)
           .font('Helvetica')
-          .text(repo.description, 50, 195, { width: 495, maxLines: 2 });
+          .text(repo.description, 50, 180, { width: 495, maxLines: 2 });
       }
 
-      // Overall Score Card
-      const scoreBoxY = 240;
+      // Score Hero Card
+      const scoreBoxY = repo.description ? 220 : 195;
       doc
-        .roundedRect(50, scoreBoxY, 495, 90, 8)
+        .roundedRect(50, scoreBoxY, 495, 85, 8)
         .fillAndStroke('#F8FAFC', '#E2E8F0');
 
       doc
         .fillColor('#475569')
-        .fontSize(11)
+        .fontSize(10)
         .font('Helvetica-Bold')
-        .text('OVERALL AI QUALITY SCORE', 70, scoreBoxY + 20);
+        .text('OVERALL AI QUALITY SCORE', 70, scoreBoxY + 18);
 
       doc
         .fillColor(scoreColor)
-        .fontSize(36)
+        .fontSize(34)
         .font('Helvetica-Bold')
-        .text(`${overallScore}`, 70, scoreBoxY + 40);
+        .text(`${overallScore}`, 70, scoreBoxY + 36);
 
       doc
         .fillColor('#94A3B8')
-        .fontSize(18)
+        .fontSize(16)
         .font('Helvetica-Bold')
-        .text('/ 100', 130, scoreBoxY + 54);
+        .text('/ 100', 125, scoreBoxY + 50);
 
-      // Score status badge text
       let scoreBadgeText = 'EXCELLENT';
-      if (overallScore < 60) scoreBadgeText = 'NEEDS IMPROVEMENT';
+      if (overallScore < 60) scoreBadgeText = 'NEEDS WORK';
       else if (overallScore < 80) scoreBadgeText = 'GOOD';
 
       doc
-        .roundedRect(390, scoreBoxY + 28, 135, 34, 4)
+        .roundedRect(390, scoreBoxY + 26, 135, 32, 4)
         .fill(scoreColor);
 
       doc
         .fillColor('#FFFFFF')
-        .fontSize(10)
+        .fontSize(9.5)
         .font('Helvetica-Bold')
-        .text(scoreBadgeText, 390, scoreBoxY + 40, { width: 135, align: 'center' });
+        .text(scoreBadgeText, 390, scoreBoxY + 36, { width: 135, align: 'center' });
 
-      // Metadata Key-Value Details Box
-      const metaY = 355;
+      // Key Metadata Box
+      const metaY = scoreBoxY + 105;
       doc
-        .roundedRect(50, metaY, 495, 120, 8)
+        .roundedRect(50, metaY, 495, 135, 8)
         .fillAndStroke('#FFFFFF', '#CBD5E1');
 
       const col1X = 70;
@@ -197,22 +195,24 @@ export const generateAnalysisPdf = (analysisDoc) => {
       let currY = metaY + 15;
 
       const metadataFields = [
-        { label: 'Owner', val: repo.owner || 'N/A', col: 1 },
-        { label: 'Primary Language', val: github.language || 'Not specified', col: 2 },
-        { label: 'Visibility', val: (repo.visibility || 'public').toUpperCase(), col: 1 },
-        { label: 'Stars / Forks', val: `${github.stars || 0} ⭐ / ${github.forks || 0} 🍴`, col: 2 },
-        { label: 'Default Branch', val: repo.defaultBranch || 'main', col: 1 },
-        { label: 'Open Issues', val: `${github.openIssues || 0}`, col: 2 },
+        { label: 'Repository Name', val: repoName, col: 1 },
+        { label: 'Primary Language', val: github.language || repo.language || 'TypeScript', col: 2 },
+        { label: 'Owner', val: repoOwner, col: 1 },
+        { label: 'Visibility', val: (repo.visibility || 'public').toUpperCase(), col: 2 },
+        { label: 'GitHub URL', val: githubUrl, col: 1 },
+        { label: 'Stars / Forks', val: `${github.stars || 0} Stars / ${github.forks || 0} Forks`, col: 2 },
+        { label: 'AI Provider', val: analysisDoc.aiProvider || 'OpenRouter', col: 1 },
+        { label: 'AI Model', val: 'Qwen3 Coder Next', col: 2 },
         {
-          label: 'Generated Date',
+          label: 'Analyzed Date',
           val: new Date(analysisDoc.createdAt || Date.now()).toLocaleDateString('en-US', {
             year: 'numeric',
-            month: 'long',
+            month: 'short',
             day: 'numeric',
           }),
           col: 1,
         },
-        { label: 'AI Engine', val: analysisDoc.aiProvider || 'Aurex AI', col: 2 },
+        { label: 'Default Branch', val: repo.defaultBranch || 'main', col: 2 },
       ];
 
       for (let i = 0; i < metadataFields.length; i += 2) {
@@ -220,12 +220,12 @@ export const generateAnalysisPdf = (analysisDoc) => {
         const item2 = metadataFields[i + 1];
 
         if (item1) {
-          doc.fillColor('#64748B').fontSize(9).font('Helvetica-Bold').text(`${item1.label}:`, col1X, currY);
-          doc.fillColor('#1E293B').fontSize(9).font('Helvetica').text(item1.val, col1X + 90, currY);
+          doc.fillColor('#64748B').fontSize(8.5).font('Helvetica-Bold').text(`${item1.label}:`, col1X, currY);
+          doc.fillColor('#1E293B').fontSize(8.5).font('Helvetica').text(String(item1.val), col1X + 90, currY, { width: 135, truncate: true });
         }
         if (item2) {
-          doc.fillColor('#64748B').fontSize(9).font('Helvetica-Bold').text(`${item2.label}:`, col2X, currY);
-          doc.fillColor('#1E293B').fontSize(9).font('Helvetica').text(item2.val, col2X + 90, currY);
+          doc.fillColor('#64748B').fontSize(8.5).font('Helvetica-Bold').text(`${item2.label}:`, col2X, currY);
+          doc.fillColor('#1E293B').fontSize(8.5).font('Helvetica').text(String(item2.val), col2X + 90, currY, { width: 135, truncate: true });
         }
 
         currY += 22;
@@ -234,10 +234,10 @@ export const generateAnalysisPdf = (analysisDoc) => {
       // Cover Page Footer Note
       doc
         .fillColor('#94A3B8')
-        .fontSize(9)
+        .fontSize(8.5)
         .font('Helvetica-Oblique')
         .text(
-          'This document contains an automated AI architectural review & quality assessment generated by Aurex.',
+          'Automated AI technical review generated by Aurex AI Engine. Proprietary & Confidential.',
           50,
           720,
           { width: 495, align: 'center' }
@@ -248,40 +248,35 @@ export const generateAnalysisPdf = (analysisDoc) => {
       // ==========================================
       doc.addPage();
 
-      // Section 1: Executive Summary
+      // Executive Summary
       drawSectionHeader(doc, '1. Executive Summary');
 
       const summaryText = ai.summary || 'No executive summary provided for this analysis.';
       doc
-        .roundedRect(50, doc.y, 495, 0, 0); // Spacer anchor
-
-      doc
         .fillColor('#334155')
-        .fontSize(10)
+        .fontSize(9.5)
         .font('Helvetica')
-        .text(summaryText, 50, doc.y, { width: 495, lineGap: 4, align: 'justify' });
+        .text(summaryText, 50, doc.y, { width: 495, lineGap: 3, align: 'justify' });
 
       doc.moveDown(1);
 
-      // Section 2: AI Category Scores
-      drawSectionHeader(doc, '2. Quality Metrics Breakdown');
+      // Quality Metrics Breakdown
+      drawSectionHeader(doc, '2. Detailed Quality Scores (Out of 100)');
 
       const scores = [
+        { label: 'Overall Score', score: ai.overallScore ?? 0 },
         { label: 'Code Quality', score: ai.codeQuality ?? 0 },
+        { label: 'Documentation', score: ai.documentation ?? 0 },
         { label: 'Architecture', score: ai.architecture ?? 0 },
+        { label: 'Maintainability', score: ai.maintainability ?? 0 },
         { label: 'Security', score: ai.security ?? 0 },
         { label: 'Performance', score: ai.performance ?? 0 },
-        { label: 'Maintainability', score: ai.maintainability ?? 0 },
-        { label: 'Documentation', score: ai.documentation ?? 0 },
         { label: 'Best Practices', score: ai.bestPractices ?? 0 },
       ];
 
-      let scoreGridY = doc.y;
-
-      scores.forEach((s, idx) => {
+      scores.forEach((s) => {
         if (doc.y > 700) {
           doc.addPage();
-          scoreGridY = doc.y;
         }
 
         const yPos = doc.y;
@@ -290,44 +285,44 @@ export const generateAnalysisPdf = (analysisDoc) => {
         // Label
         doc
           .fillColor('#1E293B')
-          .fontSize(10)
+          .fontSize(9.5)
           .font('Helvetica-Bold')
-          .text(s.label, 50, yPos, { width: 140 });
+          .text(s.label, 50, yPos, { width: 130 });
 
-        // Background progress bar track
+        // Progress bar background track
         doc
-          .roundedRect(190, yPos + 2, 240, 10, 3)
+          .roundedRect(180, yPos + 1, 240, 10, 3)
           .fill('#E2E8F0');
 
-        // Filled progress bar
+        // Progress bar fill
         const fillWidth = Math.max(4, (s.score / 100) * 240);
         doc
-          .roundedRect(190, yPos + 2, fillWidth, 10, 3)
+          .roundedRect(180, yPos + 1, fillWidth, 10, 3)
           .fill(color);
 
-        // Numeric score text
+        // Score text
         doc
           .fillColor(color)
-          .fontSize(10)
+          .fontSize(9.5)
           .font('Helvetica-Bold')
-          .text(`${s.score} / 100`, 445, yPos, { width: 100, align: 'right' });
+          .text(`${s.score} / 100`, 435, yPos, { width: 110, align: 'right' });
 
         doc.moveDown(0.75);
       });
 
-      // Section 3: Tech Stack & Topics
+      // Tech Stack
       if ((ai.techStack && ai.techStack.length > 0) || (github.topics && github.topics.length > 0)) {
-        drawSectionHeader(doc, '3. Technology Stack & Topics');
+        drawSectionHeader(doc, '3. Technology Stack');
 
         if (ai.techStack && ai.techStack.length > 0) {
-          doc.fillColor('#475569').fontSize(10).font('Helvetica-Bold').text('Tech Stack:', 50);
-          doc.fillColor('#1E293B').fontSize(10).font('Helvetica').text(ai.techStack.join(', '), 120, doc.y - 12);
+          doc.fillColor('#475569').fontSize(9.5).font('Helvetica-Bold').text('Detected Stack:', 50);
+          doc.fillColor('#1E293B').fontSize(9.5).font('Helvetica').text(ai.techStack.join(', '), 140, doc.y - 11);
           doc.moveDown(0.5);
         }
 
         if (github.topics && github.topics.length > 0) {
-          doc.fillColor('#475569').fontSize(10).font('Helvetica-Bold').text('Topics:', 50);
-          doc.fillColor('#1E293B').fontSize(10).font('Helvetica').text(github.topics.join(', '), 120, doc.y - 12);
+          doc.fillColor('#475569').fontSize(9.5).font('Helvetica-Bold').text('Topics:', 50);
+          doc.fillColor('#1E293B').fontSize(9.5).font('Helvetica').text(github.topics.join(', '), 140, doc.y - 11);
           doc.moveDown(0.5);
         }
       }
@@ -336,26 +331,25 @@ export const generateAnalysisPdf = (analysisDoc) => {
       // PAGE 3+: REVIEWS & DETAILED FINDINGS
       // ==========================================
 
-      // Detailed Reviews Section
-      drawSectionHeader(doc, '4. Detailed Architectural & Code Reviews');
+      drawSectionHeader(doc, '4. Detailed Category Reviews');
 
       const reviews = [
         { title: 'Architecture Review', text: ai.architectureReview },
         { title: 'Code Quality Review', text: ai.codeQualityReview },
+        { title: 'Documentation Review', text: ai.documentationReview },
         { title: 'Security Review', text: ai.securityReview },
         { title: 'Performance Review', text: ai.performanceReview },
         { title: 'Maintainability Review', text: ai.maintainabilityReview },
-        { title: 'Documentation Review', text: ai.documentationReview },
         { title: 'Best Practices Review', text: ai.bestPracticesReview },
       ];
 
       reviews.forEach((r) => {
         if (r.text && r.text.trim()) {
-          if (doc.y > 680) doc.addPage();
+          if (doc.y > 670) doc.addPage();
 
           doc
             .fillColor('#4F46E5')
-            .fontSize(11)
+            .fontSize(10.5)
             .font('Helvetica-Bold')
             .text(r.title, 50);
 
@@ -363,7 +357,7 @@ export const generateAnalysisPdf = (analysisDoc) => {
 
           doc
             .fillColor('#334155')
-            .fontSize(9.5)
+            .fontSize(9)
             .font('Helvetica')
             .text(r.text, 50, doc.y, { width: 495, lineGap: 3, align: 'justify' });
 
@@ -371,17 +365,31 @@ export const generateAnalysisPdf = (analysisDoc) => {
         }
       });
 
-      // Section 5: Strengths
-      drawSectionHeader(doc, '5. Identified Strengths');
+      // Strengths
+      drawSectionHeader(doc, '5. Strengths');
       drawBulletList(doc, ai.strengths, '#059669');
 
-      // Section 6: Weaknesses & Risks
-      drawSectionHeader(doc, '6. Weaknesses & Potential Risks');
+      // Weaknesses
+      drawSectionHeader(doc, '6. Weaknesses');
       drawBulletList(doc, ai.weaknesses, '#DC2626');
 
-      // Section 7: Improvement Recommendations
-      drawSectionHeader(doc, '7. Key Improvement Recommendations');
-      drawBulletList(doc, ai.suggestions, '#4F46E5');
+      // Suggestions
+      const suggestionsList = Array.isArray(ai.suggestions) && ai.suggestions.length > 0
+        ? ai.suggestions
+        : Array.isArray(ai.recommendations)
+        ? ai.recommendations
+        : [];
+      drawSectionHeader(doc, '7. Suggestions');
+      drawBulletList(doc, suggestionsList, '#D97706');
+
+      // Recommendations
+      const recommendationsList = Array.isArray(ai.recommendations) && ai.recommendations.length > 0
+        ? ai.recommendations
+        : Array.isArray(ai.suggestions)
+        ? ai.suggestions
+        : [];
+      drawSectionHeader(doc, '8. Recommendations');
+      drawBulletList(doc, recommendationsList, '#4F46E5');
 
       // ==========================================
       // GLOBAL HEADER & FOOTER WITH PAGE NUMBERS
@@ -392,14 +400,14 @@ export const generateAnalysisPdf = (analysisDoc) => {
       for (let i = range.start; i < range.start + totalPages; i++) {
         doc.switchToPage(i);
 
-        // Skip headers/footers on cover page
+        // Header & Footer on subsequent pages
         if (i > 0) {
           // Top Running Header
           doc
             .fillColor('#94A3B8')
             .fontSize(8)
             .font('Helvetica')
-            .text('AUREX  |  Repository Intelligence Report', 50, 25);
+            .text('AUREX AI  |  Repository Intelligence Report', 50, 25);
 
           doc
             .fillColor('#94A3B8')
@@ -424,7 +432,7 @@ export const generateAnalysisPdf = (analysisDoc) => {
             .fillColor('#94A3B8')
             .fontSize(8)
             .font('Helvetica')
-            .text('Confidential - Generated by Aurex Engine', 50, 812);
+            .text('Confidential - Generated by Aurex AI', 50, 812);
 
           doc
             .fillColor('#94A3B8')
@@ -434,7 +442,6 @@ export const generateAnalysisPdf = (analysisDoc) => {
         }
       }
 
-      // End PDF stream
       doc.end();
     } catch (err) {
       reject(err);
@@ -443,3 +450,4 @@ export const generateAnalysisPdf = (analysisDoc) => {
 };
 
 export default generateAnalysisPdf;
+

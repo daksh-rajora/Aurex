@@ -43,9 +43,13 @@ export const generateAnalysisPdfReportService = async ({ userId, analysisId }) =
   // Generate PDF Buffer
   const pdfBuffer = await generateAnalysisPdf(analysisDoc);
 
-  const owner = analysisDoc.repository?.owner || 'repo';
-  const name = analysisDoc.repository?.name || 'analysis';
-  const fileName = `Aurex_Report_${owner}_${name}.pdf`.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+  const rawRepoName = analysisDoc.repository?.name || 'repository';
+  const cleanRepoName = rawRepoName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  const fileName = `aurex-analysis-${cleanRepoName || 'report'}.pdf`;
 
   return {
     pdfBuffer,

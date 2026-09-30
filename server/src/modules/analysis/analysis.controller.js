@@ -87,12 +87,32 @@ export const getAnalysisHistory = asyncHandler(async (req, res) => {
     throw new ApiError(401, 'Authentication required');
   }
 
-  const history = await getAnalysisHistoryService(userId);
+  const {
+    page,
+    limit,
+    search,
+    status,
+    source,
+    dateRange,
+    sort,
+  } = req.query || {};
+
+  const historyData = await getAnalysisHistoryService({
+    userId,
+    page,
+    limit,
+    search,
+    status,
+    source,
+    dateRange,
+    sort,
+  });
 
   return res
     .status(200)
-    .json(new ApiResponse(200, history, 'Analysis history fetched successfully'));
+    .json(new ApiResponse(200, historyData, 'Analysis history fetched successfully'));
 });
+
 
 /**
  * Controller to fetch a single analysis report by analysisId.
@@ -148,6 +168,31 @@ export const deleteAnalysis = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, result, 'Analysis report deleted successfully'));
 });
 
+import { generateAnalysisPdfReportService } from '../report/report.service.js';
+
+/**
+ * Controller to export analysis report as a PDF document.
+ */
+export const exportPdfReport = asyncHandler(async (req, res) => {
+  const { analysisId } = req.params;
+  const userId = req.user?._id;
+
+  if (!userId) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  const { pdfBuffer, fileName } = await generateAnalysisPdfReportService({
+    userId,
+    analysisId,
+  });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.setHeader('Content-Length', pdfBuffer.length);
+
+  return res.status(200).send(pdfBuffer);
+});
+
 export default {
   startAnalysis,
   runAIAnalysis,
@@ -155,5 +200,7 @@ export default {
   getSingleAnalysis,
   getAnalysisReport,
   deleteAnalysis,
+  exportPdfReport,
 };
+
 
