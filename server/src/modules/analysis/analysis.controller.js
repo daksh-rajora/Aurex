@@ -188,6 +188,7 @@ export const exportPdfReport = asyncHandler(async (req, res) => {
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
   res.setHeader('Content-Length', pdfBuffer.length);
 
   return res.status(200).send(pdfBuffer);
