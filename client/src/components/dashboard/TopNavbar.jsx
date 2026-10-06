@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import {
   Search,
   Bell,
@@ -8,6 +8,8 @@ import {
   X,
   ChevronDown,
 } from 'lucide-react';
+import NotificationDropdown from './NotificationDropdown.jsx';
+import { fetchUnreadCountThunk } from '../../redux/slices/notificationSlice.js';
 
 const GithubIcon = ({ className = 'w-3.5 h-3.5' }) => (
   <svg className={`${className} fill-current`} viewBox="0 0 24 24">
@@ -16,8 +18,16 @@ const GithubIcon = ({ className = 'w-3.5 h-3.5' }) => (
 );
 
 export const TopNavbar = ({ onToggleMobileSidebar, isMobileOpen }) => {
+  const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
+  const { unreadCount } = useSelector((state) => state.notification);
+
   const [searchQuery, setSearchQuery] = useState('');
+  const [isNotificationDropdownOpen, setIsNotificationDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    dispatch(fetchUnreadCountThunk());
+  }, [dispatch]);
 
   const displayName = user?.fullName || user?.name || 'Daksh Rajora';
   const displayAvatar = user?.avatarUrl || user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80';
@@ -66,14 +76,26 @@ export const TopNavbar = ({ onToggleMobileSidebar, isMobileOpen }) => {
           <span>Connected</span>
         </div>
 
-        {/* Notifications Icon */}
-        <button
-          className="p-2 rounded-xl text-slate-400 hover:text-white bg-[#141B2D] border border-[#2A3247] hover:border-slate-600 transition-colors relative cursor-pointer"
-          aria-label="Notifications"
-        >
-          <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
-        </button>
+        {/* Notifications Icon & Popover */}
+        <div className="relative">
+          <button
+            onClick={() => setIsNotificationDropdownOpen((prev) => !prev)}
+            className="p-2 rounded-xl text-slate-400 hover:text-white bg-[#141B2D] border border-[#2A3247] hover:border-slate-600 transition-colors relative cursor-pointer"
+            aria-label="Notifications"
+          >
+            <Bell className="w-4 h-4" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 px-1.5 py-0.2 min-w-[18px] text-[10px] font-extrabold bg-indigo-600 text-white rounded-full flex items-center justify-center border-2 border-[#0F172A] shadow-md shadow-indigo-500/50 animate-bounce">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+
+          <NotificationDropdown
+            isOpen={isNotificationDropdownOpen}
+            onClose={() => setIsNotificationDropdownOpen(false)}
+          />
+        </div>
 
         {/* Help Icon */}
         <button

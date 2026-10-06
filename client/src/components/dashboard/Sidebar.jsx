@@ -15,6 +15,7 @@ import {
   Settings,
   LogOut,
   Sparkles,
+  UserCheck,
 } from 'lucide-react';
 import authService from '../../services/auth.service.js';
 import { logout } from '../../redux/slices/authSlice.js';
@@ -24,11 +25,11 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
   const dispatch = useDispatch();
   const location = useLocation();
   const { user } = useSelector((state) => state.auth);
-
   const [activeItem, setActiveItem] = useState('Dashboard');
 
   const menuItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', badge: null },
+    { name: 'Recruiter Mode', icon: UserCheck, path: '/dashboard/recruiter', badge: 'New' },
     { name: 'Repositories', icon: FolderGit2, path: '/dashboard/repositories', badge: '14' },
     { name: 'AI Analysis', icon: Bot, path: '/dashboard/analysis', badge: 'Pro' },
     { name: 'Security Scan', icon: ShieldAlert, path: '/dashboard/security', badge: '3' },
@@ -36,7 +37,7 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
     { name: 'Reports', icon: FileText, path: '/dashboard/reports', badge: null },
     { name: 'History', icon: History, path: '/dashboard/history', badge: null },
     { name: 'Favorites', icon: Star, path: '/dashboard/favorites', badge: null },
-    { name: 'Notifications', icon: Bell, path: '/dashboard/notifications', badge: '5' },
+    { name: 'Notifications', icon: Bell, path: '/dashboard/notifications', badge: unreadCount > 0 ? String(unreadCount) : null },
     { name: 'Settings', icon: Settings, path: '/dashboard/settings', badge: null },
   ];
 
