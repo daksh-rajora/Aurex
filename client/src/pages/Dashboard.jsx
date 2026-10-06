@@ -15,15 +15,21 @@ import RepositoriesPage from './Repositories/RepositoriesPage.jsx';
 import AnalysisReportPage from './Analysis/AnalysisReportPage.jsx';
 import AnalysisLoadingPage from './Analysis/AnalysisLoadingPage.jsx';
 import HistoryPage from './History/HistoryPage.jsx';
+import RecruiterModePage from './Recruiter/RecruiterModePage.jsx';
+import RecruiterHistoryPage from './Recruiter/RecruiterHistoryPage.jsx';
+import NotificationsPage from './Notifications/NotificationsPage.jsx';
 
 export const Dashboard = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
 
+  const isNotificationsRoute = location.pathname.includes('/notifications');
   const isRepositoriesRoute = location.pathname.includes('/repositories');
   const isProgressRoute = location.pathname.includes('/progress');
-  const isHistoryRoute = location.pathname.includes('/history');
-  const isAnalysisRoute = location.pathname.includes('/analysis') && !isProgressRoute && !isHistoryRoute;
+  const isRecruiterHistoryRoute = location.pathname.includes('/recruiter/history');
+  const isRecruiterRoute = location.pathname.includes('/recruiter') && !isRecruiterHistoryRoute;
+  const isHistoryRoute = location.pathname.includes('/history') && !isRecruiterHistoryRoute;
+  const isAnalysisRoute = location.pathname.includes('/analysis') && !isProgressRoute && !isHistoryRoute && !isRecruiterRoute;
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#0B1020] text-slate-100 flex font-sans select-none">
@@ -49,7 +55,13 @@ export const Dashboard = () => {
         {/* 3. Scrollable Main Content Area */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-8 space-y-6">
           <div className="max-w-7xl w-full mx-auto space-y-6">
-            {isHistoryRoute ? (
+            {isNotificationsRoute ? (
+              <NotificationsPage />
+            ) : isRecruiterHistoryRoute ? (
+              <RecruiterHistoryPage />
+            ) : isRecruiterRoute ? (
+              <RecruiterModePage />
+            ) : isHistoryRoute ? (
               <HistoryPage />
             ) : isRepositoriesRoute ? (
               <RepositoriesPage />
@@ -62,6 +74,9 @@ export const Dashboard = () => {
               <>
                 {/* Repository Analyzer Hero Card */}
                 <HeroWelcomeCard />
+
+                {/* Recruiter Mode Banner Card */}
+                <RecruiterCard />
 
                 {/* Stats Cards (4) */}
                 <StatsCards />

@@ -22,9 +22,11 @@ import {
   AlertOctagon,
   Award,
   CheckSquare,
+  UserCheck,
 } from 'lucide-react';
 import analysisService from '../../services/analysisService.js';
 import toast from 'react-hot-toast';
+import ShareReportModal from '../../components/report/ShareReportModal.jsx';
 
 export const AnalysisReportPage = () => {
   const { analysisId } = useParams();
@@ -34,6 +36,12 @@ export const AnalysisReportPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
+
+  // Share Modal States
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isGeneratingShareLink, setIsGeneratingShareLink] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -54,6 +62,10 @@ export const AnalysisReportPage = () => {
           console.log('[GET /api/analysis/:id extracted doc]:', doc);
           setReportData(doc);
           setIsLoading(false);
+
+          if (doc.shareEnabled && doc.shareToken) {
+            setShareUrl(`${window.location.origin}/shared/analysis/${doc.shareToken}`);
+          }
 
           if (doc.status === 'Processing' || doc.status === 'Pending') {
             pollInterval = setTimeout(fetchAnalysis, 2500);
@@ -192,8 +204,6 @@ export const AnalysisReportPage = () => {
 
   const rootContentsList = Array.isArray(metadata.rootContents) ? metadata.rootContents : [];
 
-  const [isExportingPDF, setIsExportingPDF] = useState(false);
-
   const handleExportPDF = async () => {
     if (!analysisId || isExportingPDF) return;
 
@@ -253,11 +263,56 @@ export const AnalysisReportPage = () => {
     }
   };
 
-  const handleShareReport = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopiedLink(true);
-    toast.success('Report URL copied to clipboard!');
-    setTimeout(() => setCopiedLink(false), 2000);
+  const handleShareReport = async () => {
+    if (!analysisId) return;
+
+    const currentDoc = reportData?.data?.data || reportData?.data || reportData || {};
+
+    if (currentDoc.shareEnabled && currentDoc.shareToken) {
+      const url = `${window.location.origin}/shared/analysis/${currentDoc.shareToken}`;
+      setShareUrl(url);
+      setIsShareModalOpen(true);
+      return;
+    }
+
+    setIsGeneratingShareLink(true);
+    try {
+      const res = await analysisService.generateShareLink(analysisId);
+      const data = res.data?.data || res.data || res;
+      const token = data.shareToken;
+      const generatedUrl = data.shareUrl || `${window.location.origin}/shared/analysis/${token}`;
+
+      setShareUrl(generatedUrl);
+      setReportData((prev) => {
+        const prevDoc = prev?.data?.data || prev?.data || prev || {};
+        const updated = {
+          ...prevDoc,
+          shareEnabled: true,
+          shareToken: token,
+        };
+        return prev?.data?.data ? { ...prev, data: { ...prev.data, data: updated } } : updated;
+      });
+
+      setIsShareModalOpen(true);
+    } catch (err) {
+      console.error('Failed to generate share link:', err);
+      toast.error(err.response?.data?.message || 'Failed to generate share link.');
+    } finally {
+      setIsGeneratingShareLink(false);
+    }
+  };
+
+  const handleShareDisabled = () => {
+    setShareUrl('');
+    setReportData((prev) => {
+      const prevDoc = prev?.data?.data || prev?.data || prev || {};
+      const updated = {
+        ...prevDoc,
+        shareEnabled: false,
+        shareToken: null,
+      };
+      return prev?.data?.data ? { ...prev, data: { ...prev.data, data: updated } } : updated;
+    });
   };
 
   const handleReanalyze = () => {
@@ -281,9 +336,16 @@ export const AnalysisReportPage = () => {
               <h1 className="text-2xl font-extrabold text-white tracking-tight">
                 {fullRepoTitle}
               </h1>
-              <span className="px-2.5 py-0.5 text-xs font-extrabold bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 rounded-full">
-                {`${aiProvider} AI Analyzed`}
-              </span>
+              {doc.sourceType === 'recruiter' || doc.isRecruiterAnalysis ? (
+                <span className="px-2.5 py-0.5 text-xs font-extrabold bg-purple-500/20 border border-purple-500/30 text-purple-300 rounded-full flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 text-purple-400" />
+                  Recruiter Analysis • Public GitHub Repository
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 text-xs font-extrabold bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 rounded-full">
+                  {`${aiProvider} AI Analyzed`}
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-400">
               Completed on {formattedDate}
@@ -313,10 +375,20 @@ export const AnalysisReportPage = () => {
 
           <button
             onClick={handleShareReport}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#141B2D] border border-[#2A3247] hover:border-indigo-500/40 text-slate-200 hover:text-white text-xs font-bold transition-all cursor-pointer shadow-md"
+            disabled={isGeneratingShareLink}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#141B2D] border border-[#2A3247] hover:border-indigo-500/40 text-slate-200 hover:text-white text-xs font-bold transition-all cursor-pointer shadow-md disabled:opacity-50"
           >
-            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5 text-purple-400" />}
-            <span>{copiedLink ? 'Copied Link' : 'Share Report'}</span>
+            {isGeneratingShareLink ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 text-purple-400 animate-spin" />
+                <span>Generating Link...</span>
+              </>
+            ) : (
+              <>
+                <Share2 className="w-3.5 h-3.5 text-purple-400" />
+                <span>Share Report</span>
+              </>
+            )}
           </button>
 
           <button
@@ -600,6 +672,15 @@ export const AnalysisReportPage = () => {
           <p className="text-xs text-slate-400">Not available</p>
         )}
       </div>
+
+      {/* Share Report Modal */}
+      <ShareReportModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        analysisId={analysisId}
+        shareUrl={shareUrl}
+        onShareDisabled={handleShareDisabled}
+      />
     </div>
   );
 };
