@@ -93,6 +93,33 @@ export const analysisService = {
     });
     return response;
   },
+
+  /**
+   * Generate / enable public share link for analysis report
+   * @param {string} analysisId
+   */
+  generateShareLink: async (analysisId) => {
+    const response = await axiosInstance.post(`/analysis/${analysisId}/share`);
+    return response.data;
+  },
+
+  /**
+   * Fetch public shared analysis report by token (No Auth)
+   * @param {string} token
+   */
+  getSharedAnalysis: async (token) => {
+    const response = await axiosInstance.get(`/analysis/shared/${token}`);
+    return response.data;
+  },
+
+  /**
+   * Disable public share link for analysis report
+   * @param {string} analysisId
+   */
+  disableShareLink: async (analysisId) => {
+    const response = await axiosInstance.delete(`/analysis/${analysisId}/share`);
+    return response.data;
+  },
 };
 
 export default analysisService;
