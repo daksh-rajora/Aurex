@@ -8,6 +8,8 @@ import githubRoutes from './routes/github.routes.js';
 import aiRoutes from './routes/ai.routes.js';
 import analysisRoutes from './modules/analysis/analysis.routes.js';
 import publicAnalysisRoutes from './modules/analysis/publicAnalysis.routes.js';
+import recruiterRoutes from './modules/recruiter/recruiter.routes.js';
+import notificationRoutes from './modules/notification/notification.routes.js';
 import jobRoutes from './routes/job.routes.js';
 import dashboardRoutes from './modules/dashboard/dashboard.routes.js';
 import reportRoutes from './modules/report/report.routes.js';
@@ -42,6 +44,12 @@ app.use('/api/analysis', analysisRoutes);
 
 // Mount Public Repository Analysis route
 app.use('/api/public-analysis', publicAnalysisRoutes);
+
+// Mount Recruiter Mode routes
+app.use('/api/recruiter', recruiterRoutes);
+
+// Mount Notification System routes
+app.use('/api/notifications', notificationRoutes);
 
 // Mount Dashboard module routes
 app.use('/api/dashboard', dashboardRoutes);
