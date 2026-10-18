@@ -205,6 +205,31 @@ const analysisSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    shareEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    shareToken: {
+      type: String,
+      default: null,
+      unique: true,
+      sparse: true,
+    },
+    shareCreatedAt: {
+      type: Date,
+      default: null,
+    },
+    sourceType: {
+      type: String,
+      enum: ['connected', 'public', 'recruiter'],
+      default: 'public',
+      index: true,
+    },
+    isRecruiterAnalysis: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   {
     timestamps: true,
@@ -213,6 +238,8 @@ const analysisSchema = new mongoose.Schema(
 );
 
 analysisSchema.index({ user: 1, createdAt: -1 });
+analysisSchema.index({ user: 1, sourceType: 1, createdAt: -1 });
+analysisSchema.index({ shareToken: 1 }, { sparse: true, unique: true });
 
 const Analysis = mongoose.model('Analysis', analysisSchema);
 
