@@ -97,6 +97,8 @@ function App() {
         <Route path="/dashboard/notifications" element={<Dashboard />} />
         <Route path="/dashboard/recruiter/history" element={<Dashboard />} />
         <Route path="/dashboard/recruiter" element={<Dashboard />} />
+        <Route path="/dashboard/history" element={<Dashboard />} />
+        <Route path="/dashboard/repositories" element={<Dashboard />} />
         <Route path="/dashboard/analysis/:analysisId/progress" element={<Dashboard />} />
         <Route path="/dashboard/analysis/:analysisId" element={<Dashboard />} />
         <Route path="/dashboard/*" element={<Dashboard />} />
