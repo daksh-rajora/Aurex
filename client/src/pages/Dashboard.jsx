@@ -11,6 +11,7 @@ import AiHealthCard from '../components/dashboard/AiHealthCard.jsx';
 import QuickActions from '../components/dashboard/QuickActions.jsx';
 import AiSuggestions from '../components/dashboard/AiSuggestions.jsx';
 import DashboardFooter from '../components/dashboard/DashboardFooter.jsx';
+import RecruiterCard from '../components/dashboard/RecruiterCard.jsx';
 import RepositoriesPage from './Repositories/RepositoriesPage.jsx';
 import AnalysisReportPage from './Analysis/AnalysisReportPage.jsx';
 import AnalysisLoadingPage from './Analysis/AnalysisLoadingPage.jsx';
