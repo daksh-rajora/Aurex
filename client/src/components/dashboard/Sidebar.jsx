@@ -25,6 +25,7 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
   const dispatch = useDispatch();
   const location = useLocation();
   const { user } = useSelector((state) => state.auth);
+  const { unreadCount = 0 } = useSelector((state) => state.notification || {});
   const [activeItem, setActiveItem] = useState('Dashboard');
 
   const menuItems = [
