@@ -31,9 +31,9 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
   const menuItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', badge: null },
     { name: 'Recruiter Mode', icon: UserCheck, path: '/dashboard/recruiter', badge: 'New' },
-    { name: 'Repositories', icon: FolderGit2, path: '/dashboard/repositories', badge: '14' },
+    { name: 'Repositories', icon: FolderGit2, path: '/dashboard/repositories', badge: null },
     { name: 'AI Analysis', icon: Bot, path: '/dashboard/analysis', badge: 'Pro' },
-    { name: 'Security Scan', icon: ShieldAlert, path: '/dashboard/security', badge: '3' },
+    { name: 'Security Scan', icon: ShieldAlert, path: '/dashboard/security', badge: null },
     { name: 'Performance', icon: Zap, path: '/dashboard/performance', badge: null },
     { name: 'Reports', icon: FileText, path: '/dashboard/reports', badge: null },
     { name: 'History', icon: History, path: '/dashboard/history', badge: null },
