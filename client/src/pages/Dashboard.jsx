@@ -19,18 +19,24 @@ import HistoryPage from './History/HistoryPage.jsx';
 import RecruiterModePage from './Recruiter/RecruiterModePage.jsx';
 import RecruiterHistoryPage from './Recruiter/RecruiterHistoryPage.jsx';
 import NotificationsPage from './Notifications/NotificationsPage.jsx';
+import SecurityScanPage from './Security/SecurityScanPage.jsx';
+import PerformancePage from './Performance/PerformancePage.jsx';
+import ReportsPage from './Reports/ReportsPage.jsx';
 
 export const Dashboard = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
 
   const isNotificationsRoute = location.pathname.includes('/notifications');
+  const isSecurityRoute = location.pathname.includes('/security');
+  const isPerformanceRoute = location.pathname.includes('/performance');
+  const isReportsRoute = location.pathname.includes('/reports');
   const isRepositoriesRoute = location.pathname.includes('/repositories');
   const isProgressRoute = location.pathname.includes('/progress');
   const isRecruiterHistoryRoute = location.pathname.includes('/recruiter/history');
   const isRecruiterRoute = location.pathname.includes('/recruiter') && !isRecruiterHistoryRoute;
   const isHistoryRoute = location.pathname.includes('/history') && !isRecruiterHistoryRoute;
-  const isAnalysisRoute = location.pathname.includes('/analysis') && !isProgressRoute && !isHistoryRoute && !isRecruiterRoute;
+  const isAnalysisRoute = location.pathname.includes('/analysis') && !isProgressRoute && !isHistoryRoute && !isRecruiterRoute && !isSecurityRoute && !isPerformanceRoute && !isReportsRoute;
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#0B1020] text-slate-100 flex font-sans select-none">
@@ -58,6 +64,12 @@ export const Dashboard = () => {
           <div className="max-w-7xl w-full mx-auto space-y-6">
             {isNotificationsRoute ? (
               <NotificationsPage />
+            ) : isSecurityRoute ? (
+              <SecurityScanPage />
+            ) : isPerformanceRoute ? (
+              <PerformancePage />
+            ) : isReportsRoute ? (
+              <ReportsPage />
             ) : isRecruiterHistoryRoute ? (
               <RecruiterHistoryPage />
             ) : isRecruiterRoute ? (
