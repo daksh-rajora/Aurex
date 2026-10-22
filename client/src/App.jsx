@@ -99,10 +99,14 @@ function App() {
         <Route path="/dashboard/recruiter" element={<Dashboard />} />
         <Route path="/dashboard/history" element={<Dashboard />} />
         <Route path="/dashboard/security" element={<Dashboard />} />
+        <Route path="/dashboard/performance" element={<Dashboard />} />
+        <Route path="/dashboard/reports" element={<Dashboard />} />
         <Route path="/dashboard/repositories" element={<Dashboard />} />
         <Route path="/dashboard/analysis/:analysisId/progress" element={<Dashboard />} />
         <Route path="/dashboard/analysis/:analysisId" element={<Dashboard />} />
         <Route path="/dashboard/*" element={<Dashboard />} />
+        <Route path="/reports" element={<Navigate to="/dashboard/reports" replace />} />
+        <Route path="/performance" element={<Navigate to="/dashboard/performance" replace />} />
         <Route path="/security" element={<Navigate to="/dashboard/security" replace />} />
         <Route path="/notifications" element={<Navigate to="/dashboard/notifications" replace />} />
         <Route path="/repositories" element={<Navigate to="/dashboard/repositories" replace />} />
