@@ -13,6 +13,8 @@ import notificationRoutes from './modules/notification/notification.routes.js';
 import jobRoutes from './routes/job.routes.js';
 import dashboardRoutes from './modules/dashboard/dashboard.routes.js';
 import reportRoutes from './modules/report/report.routes.js';
+import securityRoutes from './routes/security.routes.js';
+import performanceRoutes from './routes/performance.routes.js';
 import apiRouter from './routes/index.js';
 
 const app = express();
@@ -56,6 +58,12 @@ app.use('/api/dashboard', dashboardRoutes);
 
 // Mount PDF Report Export module routes
 app.use('/api/report', reportRoutes);
+
+// Mount Security Scan module routes
+app.use('/api/security', securityRoutes);
+
+// Mount Performance module routes
+app.use('/api/performance', performanceRoutes);
 
 // Mount Background Job routes
 app.use('/api/jobs', jobRoutes);
