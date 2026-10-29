@@ -88,7 +88,9 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
         <nav className="space-y-1">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeItem === item.name || location.pathname === item.path;
+            const isActive =
+              location.pathname === item.path ||
+              (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
 
             return (
               <button
