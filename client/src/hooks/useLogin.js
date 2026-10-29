@@ -24,7 +24,11 @@ export const useLogin = () => {
       const response = await authService.login(data);
 
       const user = response?.data?.user || response?.user || response?.data;
-      const token = response?.data?.token || response?.token || response?.accessToken;
+      const token =
+        response?.data?.token ||
+        response?.data?.accessToken ||
+        response?.token ||
+        response?.accessToken;
 
       dispatch(loginSuccess({ user, token }));
       navigate('/dashboard');
