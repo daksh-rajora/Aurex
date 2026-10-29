@@ -264,6 +264,23 @@ export const RepoCard = ({
                 <span>AI Security Scan</span>
               </button>
 
+              {onToggleFavorite && (
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    onToggleFavorite(repo);
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    repo.isFavorite
+                      ? 'text-rose-400 hover:bg-rose-500/10'
+                      : 'text-amber-400 hover:bg-amber-500/10'
+                  }`}
+                >
+                  <Star className={`w-3.5 h-3.5 ${repo.isFavorite ? 'fill-rose-400' : ''}`} />
+                  <span>{repo.isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}</span>
+                </button>
+              )}
+
               <a
                 href={`${repo.url}/issues`}
                 target="_blank"
