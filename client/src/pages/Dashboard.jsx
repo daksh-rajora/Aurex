@@ -22,11 +22,13 @@ import NotificationsPage from './Notifications/NotificationsPage.jsx';
 import SecurityScanPage from './Security/SecurityScanPage.jsx';
 import PerformancePage from './Performance/PerformancePage.jsx';
 import ReportsPage from './Reports/ReportsPage.jsx';
+import FavoritesPage from './Favorites/FavoritesPage.jsx';
 
 export const Dashboard = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
 
+  const isFavoritesRoute = location.pathname.includes('/favorites');
   const isNotificationsRoute = location.pathname.includes('/notifications');
   const isSecurityRoute = location.pathname.includes('/security');
   const isPerformanceRoute = location.pathname.includes('/performance');
@@ -62,7 +64,9 @@ export const Dashboard = () => {
         {/* 3. Scrollable Main Content Area */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 lg:p-8 space-y-6">
           <div className="max-w-7xl w-full mx-auto space-y-6">
-            {isNotificationsRoute ? (
+            {isFavoritesRoute ? (
+              <FavoritesPage />
+            ) : isNotificationsRoute ? (
               <NotificationsPage />
             ) : isSecurityRoute ? (
               <SecurityScanPage />
