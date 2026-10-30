@@ -200,6 +200,7 @@ export const RepositoriesPage = () => {
         fullName: repoFullName,
         owner: targetRepo.owner?.login || targetRepo.owner || 'owner',
         githubUrl: targetRepo.url || targetRepo.htmlUrl || `https://github.com/${repoFullName}`,
+        description: targetRepo.description || '',
         language: targetRepo.language || 'TypeScript',
         stars: targetRepo.stars || 0,
         forks: targetRepo.forks || 0,
