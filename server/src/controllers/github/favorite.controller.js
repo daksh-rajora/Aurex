@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import asyncHandler from '../../utils/asyncHandler.js';
 import ApiResponse from '../../utils/ApiResponse.js';
 import ApiError from '../../utils/ApiError.js';
@@ -19,13 +20,14 @@ export const toggleFavorite = asyncHandler(async (req, res) => {
     fullName,
     owner,
     githubUrl,
+    description,
     language,
     stars,
     forks,
     isPrivate,
   } = req.body || {};
 
-  if (!repositoryId && !fullName) {
+  if (!repositoryId && !fullName && !req.body?._id) {
     throw new ApiError(400, 'Repository ID or full name is required');
   }
 
@@ -36,13 +38,22 @@ export const toggleFavorite = asyncHandler(async (req, res) => {
   // Escaped regex pattern for exact case-insensitive full name matching
   const escapedFullNamePattern = targetFullName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+  // Match by id, repositoryId, or canonical fullName scoped to authenticated user
+  const orConditions = [];
+  if (req.body?._id && mongoose.isValidObjectId(req.body._id)) {
+    orConditions.push({ _id: req.body._id });
+  }
+  if (targetRepoId) {
+    orConditions.push({ repositoryId: targetRepoId });
+  }
+  if (targetFullName) {
+    orConditions.push({ fullName: { $regex: new RegExp(`^${escapedFullNamePattern}$`, 'i') } });
+  }
+
   // Check if repository is already favorited by this user
   const existingFavorite = await Favorite.findOne({
     user: userId,
-    $or: [
-      { repositoryId: targetRepoId },
-      { fullName: { $regex: new RegExp(`^${escapedFullNamePattern}$`, 'i') } },
-    ],
+    $or: orConditions.length > 0 ? orConditions : [{ repositoryId: targetRepoId }],
   });
 
   if (existingFavorite) {
@@ -55,11 +66,11 @@ export const toggleFavorite = asyncHandler(async (req, res) => {
         200,
         {
           isFavorite: false,
-          repositoryId: targetRepoId,
-          repositoryName: targetRepoName,
-          fullName: targetFullName,
+          repositoryId: existingFavorite.repositoryId || targetRepoId,
+          repositoryName: existingFavorite.name || targetRepoName,
+          fullName: existingFavorite.fullName || targetFullName,
         },
-        `Removed ${targetRepoName} from Favorites`
+        `Removed ${existingFavorite.name || targetRepoName} from Favorites`
       )
     );
   } else {
@@ -71,6 +82,7 @@ export const toggleFavorite = asyncHandler(async (req, res) => {
       fullName: targetFullName,
       owner: owner || targetFullName.split('/')[0] || 'owner',
       githubUrl: githubUrl || `https://github.com/${targetFullName}`,
+      description: description || '',
       language: language || 'TypeScript',
       stars: stars || 0,
       forks: forks || 0,
