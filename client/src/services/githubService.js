@@ -25,19 +25,22 @@ export function normalizeRepository(repo) {
   const ownerLogin =
     repo.owner?.login ||
     repo.owner?.name ||
+    (typeof repo.owner === 'string' ? repo.owner : '') ||
     (fullName.includes('/') ? fullName.split('/')[0] : 'owner');
   const repoName = repo.name || (fullName.includes('/') ? fullName.split('/')[1] : fullName);
 
   const avatarUrl =
     repo.owner?.avatar_url ||
     repo.owner?.avatarUrl ||
-    `https://avatars.githubusercontent.com/u/9919?v=4`;
+    (ownerLogin && ownerLogin !== 'owner'
+      ? `https://github.com/${ownerLogin}.png`
+      : `https://avatars.githubusercontent.com/u/9919?v=4`);
 
   const htmlUrl =
-    repo.html_url || repo.url || `https://github.com/${ownerLogin}/${repoName}`;
+    repo.html_url || repo.url || repo.githubUrl || `https://github.com/${ownerLogin}/${repoName}`;
 
   return {
-    id: String(repo.id || `${ownerLogin}-${repoName}`),
+    id: String(repo.id || repo.repositoryId || repo._id || `${ownerLogin}-${repoName}`),
     name: repoName,
     fullName: fullName || `${ownerLogin}/${repoName}`,
     owner: {
@@ -55,23 +58,23 @@ export function normalizeRepository(repo) {
       typeof repo.size === 'number'
         ? `${(repo.size / 1024).toFixed(1)} MB`
         : repo.size || '1.0 MB',
-    isPrivate: Boolean(repo.private || repo.visibility === 'private'),
-    visibility: repo.visibility || (repo.private ? 'private' : 'public'),
+    isPrivate: Boolean(repo.private || repo.visibility === 'private' || repo.isPrivate),
+    visibility: repo.visibility || (repo.private || repo.isPrivate ? 'private' : 'public'),
     url: htmlUrl,
     defaultBranch: repo.default_branch || repo.defaultBranch || 'main',
-    createdDate: repo.created_at
-      ? new Date(repo.created_at).toLocaleDateString('en-US', {
+    createdDate: repo.created_at || repo.createdAt
+      ? new Date(repo.created_at || repo.createdAt).toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
           year: 'numeric',
         })
       : 'N/A',
-    lastUpdated: formatTimeAgo(repo.updated_at || repo.pushed_at),
+    lastUpdated: formatTimeAgo(repo.updated_at || repo.updatedAt || repo.pushed_at || repo.createdAt),
     lastCommit: repo.pushed_at
       ? `Push on ${new Date(repo.pushed_at).toLocaleDateString()}`
       : 'Latest commit details',
     topics: Array.isArray(repo.topics) ? repo.topics : [],
-    isFavorite: Boolean(repo.isFavorite),
+    isFavorite: repo.isFavorite !== undefined ? Boolean(repo.isFavorite) : true,
     isAnalyzed: Boolean(repo.isAnalyzed),
     healthScore: repo.healthScore || null,
     license:
