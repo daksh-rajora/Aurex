@@ -49,6 +49,22 @@ export const initSocket = (httpServer) => {
       }
     });
 
+    socket.on('join_security', (scanId) => {
+      if (scanId) {
+        const room = `security:${scanId}`;
+        socket.join(room);
+        console.log(`[Socket.IO] Client ${socket.id} joined security room: ${room}`);
+      }
+    });
+
+    socket.on('leave_security', (scanId) => {
+      if (scanId) {
+        const room = `security:${scanId}`;
+        socket.leave(room);
+        console.log(`[Socket.IO] Client ${socket.id} left security room: ${room}`);
+      }
+    });
+
     socket.on('disconnect', () => {
       console.log(`[Socket.IO] Client disconnected: ${socket.id}`);
     });
@@ -81,6 +97,28 @@ export const emitAnalysisProgress = ({ analysisId, percentage, stage, status = '
 };
 
 /**
+ * Emit real-time progress update for security scans.
+ */
+export const emitSecurityProgress = ({ scanId, percentage, stage, status = 'Scanning', error = null }) => {
+  if (io && scanId) {
+    const payload = {
+      scanId: String(scanId),
+      percentage,
+      stage,
+      status,
+      error,
+      timestamp: new Date().toISOString(),
+    };
+
+    io.to(`security:${scanId}`).emit('security_progress', payload);
+    io.emit(`security:${scanId}:progress`, payload);
+    io.emit('security:global_progress', payload);
+
+    console.log(`[Socket.IO Security] [${scanId}] ${percentage}% - "${stage}" (${status})`);
+  }
+};
+
+/**
  * Emit real-time notification to a specific user.
  *
  * @param {Object} params
@@ -101,5 +139,6 @@ export default {
   initSocket,
   getIO,
   emitAnalysisProgress,
+  emitSecurityProgress,
   emitUserNotification,
 };
