@@ -66,4 +66,46 @@ export const authenticateUser = asyncHandler(async (req, res, next) => {
   next();
 });
 
+/**
+ * Optional authentication middleware: attaches req.user if a valid token is provided,
+ * but allows unauthenticated requests to proceed with req.user = null.
+ */
+export const optionalAuthenticateUser = asyncHandler(async (req, res, next) => {
+  const authHeader =
+    req.header('Authorization') ||
+    req.header('authorization') ||
+    req.headers['authorization'] ||
+    req.headers.Authorization;
+
+  if (!authHeader) {
+    req.user = null;
+    return next();
+  }
+
+  let token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader.trim();
+  if (token && ((token.startsWith('"') && token.endsWith('"')) || (token.startsWith("'") && token.endsWith("'")))) {
+    token = token.slice(1, -1).trim();
+  }
+
+  if (!token) {
+    req.user = null;
+    return next();
+  }
+
+  try {
+    const decoded = verifyAccessToken(token);
+    const userId = decoded?.userId || decoded?._id || decoded?.id;
+    if (userId) {
+      const user = await User.findById(userId).select('-password -githubAccessToken');
+      req.user = user || null;
+    } else {
+      req.user = null;
+    }
+  } catch {
+    req.user = null;
+  }
+
+  next();
+});
+
 export default authenticateUser;
