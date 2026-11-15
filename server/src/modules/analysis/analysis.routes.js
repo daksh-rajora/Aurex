@@ -7,6 +7,9 @@ import {
   getAnalysisReport,
   deleteAnalysis,
   exportPdfReport,
+  generateShareLink,
+  getSharedAnalysisReport,
+  disableShareLink,
 } from './analysis.controller.js';
 import { runPublicAnalysis } from './publicAnalysis.controller.js';
 import { validatePublicAnalysis } from './publicAnalysis.validation.js';
@@ -14,9 +17,16 @@ import {
   validateStartAnalysis,
   validateAnalysisId,
 } from './analysis.validation.js';
-import { authenticateUser } from '../../middlewares/auth.middleware.js';
+import { authenticateUser, optionalAuthenticateUser } from '../../middlewares/auth.middleware.js';
 
 const router = Router();
+
+/**
+ * @route   GET /shared/:token
+ * @desc    Get public shared analysis report (NO Authentication Required)
+ * @access  Public
+ */
+router.get('/shared/:token', getSharedAnalysisReport);
 
 /**
  * @route   POST /public
@@ -28,9 +38,9 @@ router.post('/public', authenticateUser, validatePublicAnalysis, runPublicAnalys
 /**
  * @route   GET /history
  * @desc    Return logged-in user's analysis history
- * @access  Private (JWT Required)
+ * @access  Private (JWT Required) / Optional Auth
  */
-router.get('/history', authenticateUser, getAnalysisHistory);
+router.get('/history', optionalAuthenticateUser, getAnalysisHistory);
 
 /**
  * @route   POST /start
@@ -46,6 +56,20 @@ router.post('/start', authenticateUser, startAnalysis);
  * @access  Private (JWT Required)
  */
 router.post('/:owner/:repo', authenticateUser, validateStartAnalysis, startAnalysis);
+
+/**
+ * @route   POST /:analysisId/share
+ * @desc    Generate / enable public share link for analysis report
+ * @access  Private (JWT Required)
+ */
+router.post('/:analysisId/share', authenticateUser, validateAnalysisId, generateShareLink);
+
+/**
+ * @route   DELETE /:analysisId/share
+ * @desc    Disable public share link for analysis report
+ * @access  Private (JWT Required)
+ */
+router.delete('/:analysisId/share', authenticateUser, validateAnalysisId, disableShareLink);
 
 /**
  * @route   POST /:analysisId/run
