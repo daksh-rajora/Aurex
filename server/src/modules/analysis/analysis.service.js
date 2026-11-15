@@ -1,9 +1,13 @@
+import crypto from 'crypto';
 import mongoose from 'mongoose';
+import config from '../../config/config.js';
 import User from '../../models/User.js';
 import Analysis from '../../models/Analysis.js';
 import ApiError from '../../utils/ApiError.js';
 import { repositoryDetailsService } from '../../services/github/repositoryDetails.service.js';
 import { emitAnalysisProgress } from '../../socket.js';
+import { NOTIFICATION_TYPES } from '../../constants/notificationTypes.js';
+import { createNotificationService } from '../notification/notification.service.js';
 import {
   runAIAnalysisService,
   getAnalysisReportService,
@@ -316,10 +320,10 @@ export const getAnalysisHistoryService = async ({
 
   // 2. Status filter
   if (status && status !== 'All') {
-    query.status = status;
+    query.status = new RegExp(`^${status}$`, 'i');
   }
 
-  // 3. Source filter (Connected GitHub vs Public Repository)
+  // 3. Source filter (Connected GitHub vs Public Repository vs Recruiter)
   if (source && source !== 'All') {
     if (source === 'Public Repository' || source === 'public') {
       query.$or = [
@@ -331,6 +335,8 @@ export const getAnalysisHistoryService = async ({
         { 'repository.visibility': 'private' },
         { isPublicRepo: false },
       ];
+    } else if (source === 'Recruiter Analysis' || source === 'recruiter') {
+      query.isRecruiterAnalysis = true;
     }
   }
 
@@ -470,6 +476,183 @@ export const deleteAnalysisService = async ({ userId, analysisId }) => {
   return { id: analysisId, deleted: true };
 };
 
+/**
+ * Service to generate / enable a cryptographically secure public share link for completed analysis
+ */
+export const generateShareLinkService = async ({ userId, analysisId }) => {
+  if (!userId) {
+    throw new ApiError(401, 'Authentication is required');
+  }
+
+  const analysisDoc = await Analysis.findById(analysisId);
+  if (!analysisDoc) {
+    throw new ApiError(404, 'Analysis report not found');
+  }
+
+  if (analysisDoc.user && analysisDoc.user.toString() !== userId.toString()) {
+    throw new ApiError(403, 'Unauthorized access to analysis report');
+  }
+
+  if (analysisDoc.status !== 'Completed') {
+    throw new ApiError(400, 'Only completed analyses can be shared');
+  }
+
+  if (!analysisDoc.shareToken || !analysisDoc.shareEnabled) {
+    const token = crypto.randomBytes(24).toString('hex');
+    analysisDoc.shareEnabled = true;
+    analysisDoc.shareToken = token;
+    analysisDoc.shareCreatedAt = new Date();
+    await analysisDoc.save();
+  }
+
+  const baseUrl = process.env.FRONTEND_URL || config.frontendUrl || 'http://localhost:5173';
+  const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+  const shareUrl = `${cleanBaseUrl}/shared/analysis/${analysisDoc.shareToken}`;
+
+  const repoName = analysisDoc.repository?.name || 'Repository';
+  const repoOwner = analysisDoc.repository?.owner || 'owner';
+
+  createNotificationService({
+    userId,
+    type: NOTIFICATION_TYPES.SHARE_CREATED,
+    title: 'Report Shared',
+    message: `Your analysis report for ${repoName} is now available through a shareable link.`,
+    metadata: {
+      analysisId: String(analysisDoc._id),
+      repositoryName: repoName,
+      repositoryOwner: repoOwner,
+    },
+  }).catch((err) => console.warn('[Notification Error] Share created notification failed:', err.message));
+
+  return {
+    shareUrl,
+    shareToken: analysisDoc.shareToken,
+    shareEnabled: analysisDoc.shareEnabled,
+    shareCreatedAt: analysisDoc.shareCreatedAt,
+  };
+};
+
+/**
+ * Service to fetch public shared report by token (No Auth)
+ */
+export const getSharedAnalysisReportService = async ({ token }) => {
+  if (!token || typeof token !== 'string') {
+    throw new ApiError(404, 'Analysis report not found');
+  }
+
+  const analysisDoc = await Analysis.findOne({ shareToken: token });
+  if (!analysisDoc) {
+    throw new ApiError(404, 'Analysis report not found');
+  }
+
+  if (analysisDoc.shareEnabled !== true) {
+    throw new ApiError(404, 'Sharing for this report has been disabled.');
+  }
+
+  return {
+    _id: String(analysisDoc._id),
+    repositoryName: analysisDoc.repository?.name || '',
+    repositoryOwner: analysisDoc.repository?.owner || '',
+    repositoryUrl: analysisDoc.repository?.htmlUrl || analysisDoc.github?.htmlUrl || `https://github.com/${analysisDoc.repository?.owner}/${analysisDoc.repository?.name}`,
+    analysisDate: analysisDoc.completedAt || analysisDoc.createdAt,
+    analysisSource: analysisDoc.repository?.visibility || 'public',
+    aiProvider: analysisDoc.aiProvider || 'OpenRouter',
+    aiModel: 'OpenRouter AI Engine',
+    overallScore: analysisDoc.analysis?.overallScore || 0,
+    codeQuality: analysisDoc.analysis?.codeQuality || 0,
+    architecture: analysisDoc.analysis?.architecture || 0,
+    security: analysisDoc.analysis?.security || 0,
+    performance: analysisDoc.analysis?.performance || 0,
+    documentation: analysisDoc.analysis?.documentation || 0,
+    maintainability: analysisDoc.analysis?.maintainability || 0,
+    bestPractices: analysisDoc.analysis?.bestPractices || 0,
+    techStack: analysisDoc.analysis?.techStack || [],
+    architectureReview: analysisDoc.analysis?.architectureReview || '',
+    codeQualityReview: analysisDoc.analysis?.codeQualityReview || '',
+    documentationReview: analysisDoc.analysis?.documentationReview || '',
+    securityReview: analysisDoc.analysis?.securityReview || '',
+    performanceReview: analysisDoc.analysis?.performanceReview || '',
+    maintainabilityReview: analysisDoc.analysis?.maintainabilityReview || '',
+    bestPracticesReview: analysisDoc.analysis?.bestPracticesReview || '',
+    strengths: analysisDoc.analysis?.strengths || [],
+    weaknesses: analysisDoc.analysis?.weaknesses || [],
+    suggestions: analysisDoc.analysis?.suggestions || [],
+    recommendations: analysisDoc.analysis?.recommendations || [],
+    summary: analysisDoc.analysis?.summary || '',
+    executiveSummary: analysisDoc.analysis?.summary || '',
+    repository: {
+      name: analysisDoc.repository?.name || '',
+      owner: analysisDoc.repository?.owner || '',
+      fullName: analysisDoc.repository?.fullName || '',
+      htmlUrl: analysisDoc.repository?.htmlUrl || `https://github.com/${analysisDoc.repository?.owner}/${analysisDoc.repository?.name}`,
+      defaultBranch: analysisDoc.repository?.defaultBranch || 'main',
+      visibility: analysisDoc.repository?.visibility || 'public',
+      license: analysisDoc.repository?.license || 'MIT',
+      size: analysisDoc.repository?.size || '1.0 MB',
+    },
+    github: {
+      language: analysisDoc.github?.language || '',
+      stars: analysisDoc.github?.stars || 0,
+      forks: analysisDoc.github?.forks || 0,
+      watchers: analysisDoc.github?.watchers || 0,
+      openIssues: analysisDoc.github?.openIssues || 0,
+      topics: analysisDoc.github?.topics || [],
+    },
+    metadata: {
+      languages: analysisDoc.metadata?.languages || {},
+      rootContents: analysisDoc.metadata?.rootContents || [],
+    },
+    analysis: analysisDoc.analysis || {},
+    status: analysisDoc.status,
+    completedAt: analysisDoc.completedAt,
+    createdAt: analysisDoc.createdAt,
+    shareEnabled: analysisDoc.shareEnabled,
+  };
+};
+
+/**
+ * Service to disable public share link for an analysis report
+ */
+export const disableShareLinkService = async ({ userId, analysisId }) => {
+  if (!userId) {
+    throw new ApiError(401, 'Authentication is required');
+  }
+
+  const analysisDoc = await Analysis.findById(analysisId);
+  if (!analysisDoc) {
+    throw new ApiError(404, 'Analysis report not found');
+  }
+
+  if (analysisDoc.user && analysisDoc.user.toString() !== userId.toString()) {
+    throw new ApiError(403, 'Unauthorized access to analysis report');
+  }
+
+  analysisDoc.shareEnabled = false;
+  analysisDoc.shareToken = null;
+  analysisDoc.shareCreatedAt = null;
+  await analysisDoc.save();
+
+  const repoName = analysisDoc.repository?.name || 'Repository';
+  const repoOwner = analysisDoc.repository?.owner || 'owner';
+
+  createNotificationService({
+    userId,
+    type: NOTIFICATION_TYPES.SHARE_DISABLED,
+    title: 'Report Sharing Disabled',
+    message: `Sharing has been disabled for your analysis report of ${repoName}.`,
+    metadata: {
+      analysisId: String(analysisDoc._id),
+      repositoryName: repoName,
+      repositoryOwner: repoOwner,
+    },
+  }).catch((err) => console.warn('[Notification Error] Share disabled notification failed:', err.message));
+
+  return {
+    shareEnabled: false,
+    message: 'Sharing for this analysis report has been disabled',
+  };
+};
+
 export {
   runAIAnalysisService,
   getAnalysisReportService,
@@ -481,6 +664,9 @@ export default {
   getAnalysisHistoryService,
   getSingleAnalysisService,
   deleteAnalysisService,
+  generateShareLinkService,
+  getSharedAnalysisReportService,
+  disableShareLinkService,
   runAIAnalysisService,
   getAnalysisReportService,
 };
